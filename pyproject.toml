@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rasterpilot"
+dynamic = ["version"]
+description = "Bildvorschau für RasterPilot"
+requires-python = ">=3.11"
+dependencies = ["Flask>=3.1,<4"]
+
+[tool.setuptools.dynamic]
+version = {attr = "rasterpilot.version.__version__"}
+
+[tool.setuptools.package-data]
+rasterpilot = ["templates/*.html", "static/*"]
+
+[tool.setuptools.packages.find]
+include = ["rasterpilot*"]
+namespaces = false

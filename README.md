@@ -8,7 +8,22 @@ Vom Bild zum druckfertigen Halbtonraster.
 
 RasterPilot ist als deutschsprachige Web-App geplant, die Fotos und Grafiken in Halbtonraster für DTF-Druckvorlagen umwandelt. Dabei entstehen Rasterpunkte mit transparenten Zwischenräumen. Die Anwendung soll auf Desktop und Tablet im Browser bedient werden und ohne GPU auskommen.
 
-> **Projektstatus:** RasterPilot befindet sich in der Planungsphase. Die nachfolgend beschriebenen Funktionen und der Betrieb sind vorgesehen und noch nicht implementiert.
+> **Projektstatus:** Die erste Bildvorschau ist verfügbar. Halbtonraster, Export und Produktionsbetrieb sind noch in Planung.
+
+## Lokal starten
+
+Voraussetzung ist Python ab Version 3.11. Für den lokalen Entwicklungsstart:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e .
+flask --app rasterpilot:create_app run
+```
+
+Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen.
+
+Die aktuelle Vorschau lädt PNG- und JPEG-Dateien lokal im Browser, bietet einen numerischen Zuschnitt sowie Druckgrößenberechnung und Textilfarbvorschau. Bilder bleiben im Browser; Rasterung und Export sind noch nicht verfügbar. Die Vorschau ist auf 1600 Pixel Kantenlänge begrenzt und keine Druckfreigabe. Dateien dürfen höchstens 20 MiB und 40 Megapixel groß sein. Die Unterstützung von Bildorientierung und Farbprofil hängt derzeit vom Browser ab.
 
 ## Was soll RasterPilot können?
 

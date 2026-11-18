@@ -57,6 +57,12 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name _;
+    client_max_body_size 21m;
+    # Bilder werden von Flask begrenzt im Arbeitsspeicher verarbeitet.
+    # Auch Nginx soll Uploads nicht zunächst vollständig auf Platte puffern.
+    proxy_request_buffering off;
+    proxy_buffering off;
+    proxy_http_version 1.1;
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;

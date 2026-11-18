@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rasterpilot"
 dynamic = ["version"]
-description = "Bildvorschau für RasterPilot"
+description = "Halbtonraster und PNG-Export für RasterPilot"
 requires-python = ">=3.11"
-dependencies = ["Flask>=3.1,<4"]
+dependencies = ["Flask>=3.1,<4", "Pillow>=12.2,<13", "numpy>=2.2,<3"]
 
 [tool.setuptools.dynamic]
 version = {attr = "rasterpilot.version.__version__"}

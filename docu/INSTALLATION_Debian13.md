@@ -1,6 +1,6 @@
 # RasterPilot unter Debian 13 installieren
 
-Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch installierten Debian-13-Rechner oder einen unprivilegierten Debian-13-LXC unter Proxmox. RasterPilot ist derzeit eine Vorschau; Rasterung und Export sind noch nicht verfügbar. Das Skript richtet Python, Gunicorn, Nginx und einen automatisch startenden Dienst ein. Eine lokale Kopie des GitHub-Repositories ist nicht erforderlich.
+Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch installierten Debian-13-Rechner oder einen unprivilegierten Debian-13-LXC unter Proxmox. RasterPilot bietet experimentelle farbige Rasterung und PNG-Export; Druckprofile sind noch nicht kalibriert. Das Skript richtet Python, Gunicorn, Nginx und einen automatisch startenden Dienst ein. Eine lokale Kopie des GitHub-Repositories ist nicht erforderlich.
 
 ## Voraussetzungen
 
@@ -8,6 +8,8 @@ Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch i
 - Zugang zur Konsole als `root` oder als Benutzer mit `sudo`-Rechten. Im Proxmox-LXC kann die Konsole über die Proxmox-Oberfläche geöffnet werden.
 - Ein eigenes System für RasterPilot: Das Skript ersetzt die aktivierte Nginx-Standardseite und belegt Port 80. Es ist nicht für einen bereits anderweitig eingerichteten Webserver gedacht.
 - Das GitHub-Repository muss für diesen Installationsweg öffentlich sein. Prüfen lässt sich das durch Öffnen von `https://github.com/know-how-schmiede/RasterPilot` in einem privaten Browserfenster ohne GitHub-Anmeldung. Für die Python-Pakete wird ebenfalls Internetzugang benötigt.
+
+Das Skript installiert Flask, Pillow (ab 12.2, kleiner 13) und NumPy (ab 2.2, kleiner 3) in der eigenen Python-Umgebung. Auf dem Debian-System wird Python 3.13 verwendet; lokal ist Python ab 3.11 unterstützt. Die neue Verarbeitung wurde bislang unter Windows/Python 3.12 automatisiert geprüft; eine vollständige Debian-13-Prüfung der Rasterung und eine Speichermessung im 4-GB-LXC stehen noch aus.
 
 Die folgenden Befehle sind für `root` geschrieben. Als anderer Benutzer jedem Befehl `sudo` voranstellen. Jeden Befehlsblock vollständig kopieren und ausführen; eine Passwortabfrage bei `sudo` ist normal.
 
@@ -48,6 +50,36 @@ sudo rasterpilot-update
 ```
 
 Als `root` entfällt `sudo`. Das Skript lädt den aktuellen Stand des Standard-Branches, installiert ihn in einer neuen Umgebung und startet den Dienst neu. Während des Neustarts ist die Anwendung kurz nicht erreichbar. Bei einem fehlgeschlagenen Start versucht das Skript, die vorherige Version wiederherzustellen. Alte Versionen bleiben unter `/opt/rasterpilot/releases` erhalten und belegen Speicherplatz. Das Update kann spätere Anpassungen an Nginx oder dem systemd-Dienst nicht automatisch übernehmen; Hinweise zu solchen Änderungen stehen gegebenenfalls in der jeweiligen Veröffentlichung.
+
+### Bestehende Installation auf 0.2.0 umstellen
+
+Sobald Version 0.2.0 auf GitHub veröffentlicht ist, zunächst `rasterpilot-update` ausführen. Ein bereits vor der Rechtekorrektur installiertes Updateskript muss vorher wie unten im Abschnitt zum 502-Fehler beschrieben ersetzt werden.
+
+Ab 0.2.0 werden Bilder zur Berechnung an den eigenen Server übertragen und im Arbeitsspeicher verarbeitet. Dateien dürfen 20 MiB und 40 Megapixel, Ausgaben 12 Megapixel und 12000 Pixel je Kante nicht überschreiten. Eine Berechnung bindet derzeit einen Webprozess; eine Warteschlange und ein separater Worker folgen später. Originale und Ergebnisse werden nicht als Dateien gespeichert. Nginx muss für diesen Ablauf ebenfalls angepasst werden; ein Quellcodeupdate allein ändert dessen Konfiguration nicht.
+
+Bei einer bestehenden Installation als root die Konfiguration sichern und öffnen:
+
+```sh
+cp -an /etc/nginx/sites-available/rasterpilot /etc/nginx/sites-available/rasterpilot.vor-0.2.0
+nano /etc/nginx/sites-available/rasterpilot
+```
+
+Im `server { ... }`-Block vor `location / { ... }` diese Direktiven ergänzen. Falls eine bereits vorhanden ist, ihren Wert entsprechend ändern; jede Direktive dort nur einmal angeben:
+
+```nginx
+client_max_body_size 21m;
+proxy_request_buffering off;
+proxy_buffering off;
+proxy_http_version 1.1;
+```
+
+`21m` lässt Platz für die Formulardaten zusätzlich zum 20-MiB-Bildlimit; die Anwendung prüft das Bildlimit separat. Die deaktivierte Anfrage-/Antwortpufferung vermeidet das Zwischenspeichern von Bilddaten in Nginx-Temporärdateien. Anschließend Konfiguration prüfen und nur bei erfolgreicher Prüfung neu laden:
+
+```sh
+nginx -t && systemctl reload nginx
+```
+
+Neue Installationen über das aktuelle Installationsskript enthalten diese Einstellungen bereits. Danach die Browserseite neu laden, ein PNG/JPEG importieren, Raster berechnen und Download sowie 100-%-Ansicht prüfen. Eine Datei über 1 MiB zusätzlich testen, um das frühere Nginx-Standardlimit auszuschließen. Eine lokal erzeugte, reproduzierbare Laufzeit-/Speichermessung ist mit `/opt/rasterpilot/current/venv/bin/python /opt/rasterpilot/current/source/scripts/benchmark_processing.py` möglich; das Skript verwendet ausschließlich synthetische Bilddaten.
 
 ## Status und Fehlerbehebung
 

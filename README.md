@@ -8,7 +8,7 @@ Vom Bild zum druckfertigen Halbtonraster.
 
 RasterPilot ist als deutschsprachige Web-App geplant, die Fotos und Grafiken in Halbtonraster für DTF-Druckvorlagen umwandelt. Dabei entstehen Rasterpunkte mit transparenten Zwischenräumen. Die Anwendung soll auf Desktop und Tablet im Browser bedient werden und ohne GPU auskommen.
 
-> **Projektstatus:** Die erste Bildvorschau ist verfügbar. Halbtonraster, Export und Produktionsbetrieb sind noch in Planung.
+> **Projektstatus:** Farbiges Auflockern und transparenter PNG-Export sind als experimenteller Ablauf verfügbar. Weitere Rastermodi, Hintergrund-Worker und Druckkalibrierung folgen.
 
 ## Installation auf Debian 13
 
@@ -25,9 +25,11 @@ pip install -e .
 flask --app rasterpilot:create_app run
 ```
 
-Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen.
+Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen. Die Oberflächen-Zustandstests benötigen zusätzlich Node.js und laufen mit `node --test tests/test_ui.cjs`; Node.js wird für den Betrieb der Anwendung nicht benötigt.
 
-Die aktuelle Vorschau lädt PNG- und JPEG-Dateien lokal im Browser, bietet einen numerischen Zuschnitt sowie Druckgrößenberechnung und Textilfarbvorschau. Bilder bleiben im Browser; Rasterung und Export sind noch nicht verfügbar. Die Vorschau ist auf 1600 Pixel Kantenlänge begrenzt und keine Druckfreigabe. Dateien dürfen höchstens 20 MiB und 40 Megapixel groß sein. Die Unterstützung von Bildorientierung und Farbprofil hängt derzeit vom Browser ab.
+Der aktuelle Ablauf importiert PNG/JPEG, berücksichtigt EXIF-Orientierung und Farbprofile und bietet numerischen Zuschnitt, Druckgrößenberechnung, farbige Rasterung sowie PNG-Export mit sRGB-Profil, binärem Alpha und ppi-Metadaten. Originalvergleich, 100-%-Ergebnisansicht, Transparenzraster und Textilfarbe helfen beim Prüfen. Die [Bedienungsanleitung](docu/BEDIENUNG.md) erklärt die Schritte und Grenzen.
+
+Bilder werden an den eigenen RasterPilot-Server übertragen und dort im Arbeitsspeicher verarbeitet; es gibt keine Projekt- oder Bildablage. Eingaben sind auf 20 MiB/40 Megapixel, Ausgaben auf 12 Megapixel/12000 Pixel je Kante begrenzt. Der Rasterabstand muss mindestens zwei Ausgabepixel betragen. Ohne eingebettetes Profil gilt eine angezeigte sRGB-Annahme; unlesbare Profile und CMYK ohne Profil werden abgewiesen. Alle Druckeinstellungen sind unkalibriert, die Vorschau ist keine Druckfreigabe. Bestehende Debian-Installationen benötigen für Uploads über 1 MiB die [Nginx-Anpassung für 0.2.0](docu/INSTALLATION_Debian13.md#bestehende-installation-auf-020-umstellen).
 
 ## Was soll RasterPilot können?
 
@@ -45,13 +47,13 @@ Die Textilfarbe dient nur der Vorschau und wird nicht in das Exportbild eingerec
 1. **Bild vorbereiten:** RasterPilot prüft und dekodiert die Datei, berücksichtigt Ausrichtung und Farbprofil und erhält vorhandene Transparenz. Der Zuschnitt erfolgt vor der endgültigen Skalierung.
 2. **Druckgröße festlegen:** Aus Druckbreite und Ausgabeauflösung werden die Pixelmaße berechnet; das Seitenverhältnis bleibt erhalten. Die Auflösung beschreibt dabei das Bild und nicht die Hardwareauflösung des Druckers.
 3. **Raster berechnen:** Je nach Modus bestimmen eine eingestellte Deckung, die Bildhelligkeit oder der Alphakanal die Rasterpunkte. Rasterabstand und Punktgröße werden in Bezug auf die spätere Druckgröße behandelt.
-4. **Prüfen und exportieren:** Eine Vorschau und ein Ausschnitt in Exportauflösung sollen die Beurteilung erleichtern. Der Export ist als sRGB-PNG mit transparenten Zwischenräumen und Auflösungsmetadaten geplant. Für den finalen Export soll der Alphakanal vollständig deckend oder vollständig transparent sein.
+4. **Prüfen und exportieren:** Die Ergebnisansicht verwendet dieselbe PNG-Datei wie der Download; bei 100 % lassen sich die Exportpixel durch Scrollen prüfen. Der Export enthält sRGB-Farbprofil, transparente Zwischenräume und Auflösungsmetadaten. Der Alphakanal ist vollständig deckend oder vollständig transparent.
 
 RasterPilot erstellt die Bildvorlage. Weißunterlegung, Farbseparation, Druckerprofil, gegebenenfalls Spiegelung und Druckeransteuerung bleiben Aufgaben der DTF-RIP-Software. Die Druckbreite sollte dort überprüft werden, da Programme Auflösungsmetadaten unterschiedlich auswerten können. Eine Vorschau ersetzt keinen realen Testdruck; Druckprofile gelten erst nach entsprechender Kalibrierung als geprüft.
 
 ## Geplante Umsetzung
 
-Die Bildverarbeitung soll unabhängig von Oberfläche und Webserver entstehen, damit derselbe Kern später auch in einer Desktop-App oder in NeoFab2 verwendet werden kann. Vorgesehen sind Python, Flask, NumPy und Pillow sowie eine schlanke Browseroberfläche mit HTML, CSS und JavaScript. Ein separater Worker mit begrenzter Warteschlange soll Exporte ausführen; SQLite kann den Jobstatus zwischen Webprozess und Worker verwalten.
+Die Bildverarbeitung liegt unabhängig von Oberfläche und Webserver in `rasterpilot/processing`, damit derselbe Kern später auch in einer Desktop-App oder in NeoFab2 verwendet werden kann. Verwendet werden Python, Flask, NumPy und Pillow sowie eine Browseroberfläche mit HTML, CSS und JavaScript. Berechnungen laufen derzeit synchron im Webprozess. Ein separater Worker mit begrenzter Warteschlange ist für Etappe 5 vorgesehen; SQLite kann dann den Jobstatus zwischen Webprozess und Worker verwalten.
 
 Die Entwicklung ist in Etappen geplant:
 

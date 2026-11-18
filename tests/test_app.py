@@ -16,7 +16,7 @@ class AppTest(unittest.TestCase):
     def test_home_and_assets(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Dein Motiv vorbereiten', response.get_data(as_text=True))
+        self.assertIn('Dein Motiv auflockern', response.get_data(as_text=True))
         for path in ('/static/app.js', '/static/style.css'):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)

@@ -1,0 +1,63 @@
+"""Reproduzierbarer Durchlauf ohne Benutzerdaten: python scripts/benchmark_processing.py."""
+
+import ctypes
+from io import BytesIO
+import json
+import platform
+from time import perf_counter
+
+import numpy as np
+from PIL import Image
+
+from rasterpilot.processing import Parameters, load_image, render_png
+
+
+def peak_mib():
+    if platform.system() == 'Windows':
+        from ctypes import wintypes
+
+        class Counters(ctypes.Structure):
+            _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD)] + [
+                (name, ctypes.c_size_t) for name in (
+                    'PeakWorkingSetSize', 'WorkingSetSize', 'QuotaPeakPagedPoolUsage',
+                    'QuotaPagedPoolUsage', 'QuotaPeakNonPagedPoolUsage',
+                    'QuotaNonPagedPoolUsage', 'PagefileUsage', 'PeakPagefileUsage')]
+
+        kernel = ctypes.WinDLL('kernel32')
+        kernel.GetCurrentProcess.restype = wintypes.HANDLE
+        counters = Counters()
+        counters.cb = ctypes.sizeof(counters)
+        api = ctypes.WinDLL('psapi').GetProcessMemoryInfo
+        api.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
+        if not api(kernel.GetCurrentProcess(), ctypes.byref(counters), counters.cb):
+            raise ctypes.WinError()
+        return counters.PeakWorkingSetSize / 1024 ** 2
+    import resource
+    value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return value / (1024 ** 2 if platform.system() == 'Darwin' else 1024)
+
+
+def main():
+    # Deterministisches Rauschmotiv belastet PNG-Kompression stärker als Flächen.
+    pixels = np.random.default_rng(2026).integers(0, 256, (2400, 2400, 3), dtype=np.uint8)
+    source = BytesIO()
+    with Image.fromarray(pixels) as image:
+        image.save(source, format='PNG')
+    del pixels
+    input_bytes = source.tell()
+    source.seek(0)
+    start = perf_counter()
+    image, _ = load_image(source)
+    with image:
+        parameters = Parameters.from_dict(dict(width_cm=28, ppi=300, x=0, y=0,
+            crop_width=2400, crop_height=2400, spacing_mm=1, coverage=65), image.size)
+        with render_png(image, parameters) as result:
+            output_bytes = result.getbuffer().nbytes
+    print(json.dumps(dict(system=platform.platform(), python=platform.python_version(),
+        output_size=parameters.output_size(), seconds=round(perf_counter() - start, 3),
+        peak_process_mib=round(peak_mib(), 1), input_mib=round(input_bytes / 1024 ** 2, 2),
+        output_mib=round(output_bytes / 1024 ** 2, 2)), ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()

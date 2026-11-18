@@ -6,7 +6,7 @@ REPO_URL=${RASTERPILOT_REPO_URL:-https://github.com/know-how-schmiede/RasterPilo
 BASE=/opt/rasterpilot
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo 'Bitte das Installationsskript mit sudo oder als root ausführen.' >&2
+    echo 'Bitte das Installationsskript als root ausführen. Mit su - zur root-Shell wechseln und sh /tmp/rasterpilot-install.sh starten.' >&2
     exit 1
 fi
 if [ -e "$BASE/current" ] || [ -L "$BASE/current" ]; then
@@ -20,7 +20,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git python3 python3-venv nginx curl ca-certificates
+apt-get install -y sudo git python3 python3-venv nginx curl ca-certificates
 if ! id rasterpilot >/dev/null 2>&1; then
     useradd --system --home-dir /var/lib/rasterpilot --create-home --shell /usr/sbin/nologin rasterpilot
 fi

@@ -4,12 +4,18 @@ set -eu
 BASE=/opt/rasterpilot
 REPO_URL=${RASTERPILOT_REPO_URL:-https://github.com/know-how-schmiede/RasterPilot.git}
 if [ "$(id -u)" -ne 0 ]; then
-    echo 'Bitte das Update mit sudo rasterpilot-update oder als root ausführen.' >&2
+    echo 'Bitte das Update als root ausführen. Mit su - zur root-Shell wechseln und /usr/local/bin/rasterpilot-update starten.' >&2
     exit 1
 fi
 if [ ! -x "$BASE/current/venv/bin/gunicorn" ]; then
     echo 'Keine RasterPilot-Installation gefunden. Bitte zuerst installieren.' >&2
     exit 1
+fi
+if ! command -v sudo >/dev/null 2>&1; then
+    echo 'sudo ist noch nicht installiert und wird nachinstalliert. Das Update läuft als root weiter.'
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y sudo
 fi
 old=$(readlink -f "$BASE/current")
 release=$(mktemp -d "$BASE/releases/release.XXXXXXXX")

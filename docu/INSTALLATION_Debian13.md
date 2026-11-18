@@ -5,13 +5,13 @@ Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch i
 ## Voraussetzungen
 
 - Debian 13 mit Internetzugang und mindestens 2 CPU-Kernen sowie 4 GB RAM als vorläufige Empfehlung.
-- Zugang zur Konsole als `root` oder als Benutzer mit `sudo`-Rechten. Im Proxmox-LXC kann die Konsole über die Proxmox-Oberfläche geöffnet werden.
+- Zugang zur Konsole als `root` oder die Möglichkeit, mit `su -` und dem root-Passwort zur root-Shell zu wechseln. Im Proxmox-LXC kann die Konsole über die Proxmox-Oberfläche geöffnet werden. Ein bereits eingerichteter Benutzer mit installiertem `sudo` und passenden Rechten kann es alternativ verwenden.
 - Ein eigenes System für RasterPilot: Das Skript ersetzt die aktivierte Nginx-Standardseite und belegt Port 80. Es ist nicht für einen bereits anderweitig eingerichteten Webserver gedacht.
 - Das GitHub-Repository muss für diesen Installationsweg öffentlich sein. Prüfen lässt sich das durch Öffnen von `https://github.com/know-how-schmiede/RasterPilot` in einem privaten Browserfenster ohne GitHub-Anmeldung. Für die Python-Pakete wird ebenfalls Internetzugang benötigt.
 
 Das Skript installiert Flask, Pillow (ab 12.2, kleiner 13) und NumPy (ab 2.2, kleiner 3) in der eigenen Python-Umgebung. Auf dem Debian-System wird Python 3.13 verwendet; lokal ist Python ab 3.11 unterstützt. Die neue Verarbeitung wurde bislang unter Windows/Python 3.12 automatisiert geprüft; eine vollständige Debian-13-Prüfung der Rasterung und eine Speichermessung im 4-GB-LXC stehen noch aus.
 
-Die folgenden Befehle sind für `root` geschrieben. Als anderer Benutzer jedem Befehl `sudo` voranstellen. Jeden Befehlsblock vollständig kopieren und ausführen; eine Passwortabfrage bei `sudo` ist normal.
+Die folgenden Befehle sind für `root` geschrieben und benötigen beim Aufruf kein `sudo`. Bei einer Konsole wie `root@RasterPilot:~#` bereits direkt fortfahren. Als anderer Benutzer zuerst `su -` ausführen und das root-Passwort eingeben. Jeden Befehlsblock vollständig kopieren und ausführen.
 
 ## Installation
 
@@ -29,7 +29,9 @@ curl -fL https://raw.githubusercontent.com/know-how-schmiede/RasterPilot/main/sc
 sh /tmp/rasterpilot-install.sh
 ```
 
-Das `&&` führt das Skript nur aus, wenn der Download erfolgreich war. Bei einem Benutzer mit `sudo` lautet die letzte Zeile `sudo sh /tmp/rasterpilot-install.sh`. Die Installation kann einige Minuten dauern. Sie verwendet den aktuellen Stand des Standard-Branches des öffentlichen Repositories. Bei einer Fehlermeldung den angezeigten Fehler beheben und das Skript erneut ausführen; meldet es eine bestehende Installation, siehe Fehlerbehebung.
+Das `&&` führt das Skript nur aus, wenn der Download erfolgreich war. Das Installationsskript installiert `sudo` zusammen mit den übrigen Systempaketen; beim ersten Aufruf muss es deshalb noch nicht vorhanden sein. Die Installation kann einige Minuten dauern. Sie verwendet den aktuellen Stand des Standard-Branches des öffentlichen Repositories. Bei einer Fehlermeldung den angezeigten Fehler beheben und das Skript erneut ausführen; meldet es eine bestehende Installation, siehe Fehlerbehebung.
+
+Optional kann ein bereits berechtigter Benutzer mit vorhandenem `sudo` die letzte Zeile als `sudo sh /tmp/rasterpilot-install.sh` ausführen. Die Installation des Pakets richtet keine neuen sudo-Berechtigungen ein.
 
 Die Serveradresse anzeigen:
 
@@ -43,13 +45,27 @@ Auf einem anderen Gerät im selben Netzwerk `http://SERVER-IP/` im Browser öffn
 
 ## Update
 
-Auf der Serverkonsole ausführen:
+Auf der Serverkonsole als root ausführen:
 
 ```sh
-sudo rasterpilot-update
+/usr/local/bin/rasterpilot-update
 ```
 
-Als `root` entfällt `sudo`. Das Skript lädt den aktuellen Stand des Standard-Branches, installiert ihn in einer neuen Umgebung und startet den Dienst neu. Während des Neustarts ist die Anwendung kurz nicht erreichbar. Bei einem fehlgeschlagenen Start versucht das Skript, die vorherige Version wiederherzustellen. Alte Versionen bleiben unter `/opt/rasterpilot/releases` erhalten und belegen Speicherplatz. Das Update kann spätere Anpassungen an Nginx oder dem systemd-Dienst nicht automatisch übernehmen; Hinweise zu solchen Änderungen stehen gegebenenfalls in der jeweiligen Veröffentlichung.
+Fehlt `sudo`, installiert die aktuelle Skriptversion das Paket zunächst über `apt-get` nach. Dafür benötigt sie ebenfalls root-Rechte. Bei einem Paketfehler bricht sie vor dem Anlegen oder Aktivieren einer neuen Anwendungsversion ab. Ein bereits berechtigter Benutzer mit installiertem `sudo` kann alternativ `sudo /usr/local/bin/rasterpilot-update` verwenden. Das Paket allein verleiht einem Benutzer keine sudo-Rechte.
+
+Das Skript lädt den aktuellen Stand des Standard-Branches, installiert ihn in einer neuen Umgebung und startet den Dienst neu. Während des Neustarts ist die Anwendung kurz nicht erreichbar. Bei einem fehlgeschlagenen Start versucht das Skript, die vorherige Version wiederherzustellen. Alte Versionen bleiben unter `/opt/rasterpilot/releases` erhalten und belegen Speicherplatz. Das Update kann spätere Anpassungen an Nginx oder dem systemd-Dienst nicht automatisch übernehmen; Hinweise zu solchen Änderungen stehen gegebenenfalls in der jeweiligen Veröffentlichung.
+
+### Meldung „sudo: command not found“
+
+Diese Meldung entsteht bereits vor dem Start des Skripts. Als root den oben angegebenen Updatebefehl direkt ausführen. Als anderer Benutzer zunächst mit `su -` zur root-Shell wechseln. Eine separate Installation von `sudo` ist für diesen Aufruf nicht erforderlich.
+
+Falls auf dem Server noch eine ältere Skriptversion liegt, nach Veröffentlichung der Korrektur zuerst den Updater erneuern und dann starten, jeweils als root:
+
+```sh
+curl -fL https://raw.githubusercontent.com/know-how-schmiede/RasterPilot/main/scripts/update.sh -o /tmp/rasterpilot-update.sh &&
+install -m 755 /tmp/rasterpilot-update.sh /usr/local/bin/rasterpilot-update &&
+/usr/local/bin/rasterpilot-update
+```
 
 ### Bestehende Installation auf 0.2.0 umstellen
 

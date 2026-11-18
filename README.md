@@ -25,7 +25,7 @@ pip install -e .
 flask --app rasterpilot:create_app run
 ```
 
-Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen. Die Oberflächen-Zustandstests benötigen zusätzlich Node.js und laufen mit `node --test tests/test_ui.cjs`; Node.js wird für den Betrieb der Anwendung nicht benötigt.
+Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen. Die Oberflächen-Zustandstests benötigen zusätzlich Node.js und laufen mit `node --test tests/test_ui.cjs`; die isolierten Installations-/Updatetests mit `node --test tests/test_install_scripts.cjs` benötigen außerdem eine POSIX-Shell (unter Windows Git Bash). Node.js wird für den Betrieb der Anwendung nicht benötigt.
 
 Der aktuelle Ablauf importiert PNG/JPEG, berücksichtigt EXIF-Orientierung und Farbprofile und bietet numerischen Zuschnitt, Druckgrößenberechnung, farbige Rasterung sowie PNG-Export mit sRGB-Profil, binärem Alpha und ppi-Metadaten. Originalvergleich, 100-%-Ergebnisansicht, Transparenzraster und Textilfarbe helfen beim Prüfen. Die [Bedienungsanleitung](docu/BEDIENUNG.md) erklärt die Schritte und Grenzen.
 

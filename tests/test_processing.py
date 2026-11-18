@@ -93,6 +93,26 @@ class ProcessingTest(unittest.TestCase):
         p = Parameters.from_dict(options(width_cm=2.54, ppi=101, crop_width=2, crop_height=1), (2, 1))
         self.assertEqual(p.output_size(), (101, 51))
 
+    def test_midjourney_portrait_at_default_print_settings(self):
+        image = Image.new('RGBA', (1904, 2544), 'white')
+        p = Parameters.from_dict(options(width_cm=28, ppi=300, crop_width=1904,
+            crop_height=2544, spacing_mm=1), image.size)
+        self.assertEqual(p.output_size(), (3307, 4419))
+        with render_png(image, p) as data, Image.open(data) as result:
+            self.assertEqual(result.size, (3307, 4419))
+            self.assertAlmostEqual(result.info['dpi'][0], 300, delta=0.02)
+            self.assertEqual(result.getchannel('A').getextrema(), (0, 255))
+
+    def test_output_pixel_and_side_limits_still_apply(self):
+        # 6000² ist zulässig, 6500² überschreitet 40 MP; sehr schmale
+        # Ausschnitte dürfen trotz kleiner Fläche nicht die Kantengrenze umgehen.
+        p = Parameters.from_dict(options(width_cm=50.8, ppi=300), (256, 256))
+        self.assertEqual(p.output_size(), (6000, 6000))
+        for changes in (dict(width_cm=55.0333333333, ppi=300),
+                        dict(width_cm=110, ppi=300, crop_height=1)):
+            with self.subTest(changes=changes), self.assertRaises(ImageError):
+                Parameters.from_dict(options(**changes), (256, 256))
+
     def test_decode_exif_orientation_and_remove_metadata(self):
         image = Image.new('RGB', (30, 20), 'red')
         exif = Image.Exif(); exif[274] = 6

@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-function setup() {
+function setup({ sourceWidth = 256, sourceHeight = 256 } = {}) {
   const controls = {};
   const defaults = { width: '28', ppi: '300', x: '0', y: '0', cropWidth: '', cropHeight: '',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
@@ -34,7 +34,7 @@ function setup() {
       if (pending && path.endsWith('render')) return pending;
       return {
         ok: true, blob: async () => new Blob(['png']),
-        headers: new Map([['X-Image-Width', '256'], ['X-Image-Height', '256'], ['X-Image-Notes', '[]']])
+        headers: new Map([['X-Image-Width', String(sourceWidth)], ['X-Image-Height', String(sourceHeight)], ['X-Image-Notes', '[]']])
       };
     }
   });
@@ -81,13 +81,28 @@ test('Verspätetes Ergebnis überschreibt keine neuen Einstellungen', async () =
   assert.equal(ui.c.render.disabled, false);
 });
 
-test('Unzulässige Größe blendet Vorschau aus und sperrt Berechnung', async () => {
+test('Unzulässige Exportgröße sperrt Berechnung und erhält Originalvorschau', async () => {
   const { c, importImage } = setup();
   await importImage();
   c.width.value = '200'; c.width.fire('input');
-  assert.match(c.message.textContent, /12 Megapixel/);
+  assert.match(c.message.textContent, /40 Megapixel/);
   assert.equal(c.render.disabled, true);
-  assert.equal(c.canvas.hidden, true);
+  assert.equal(c.canvas.hidden, false);
+  assert.equal(c.download.hidden, true);
+  c.width.value = '28'; c.width.fire('input');
+  assert.equal(c.render.disabled, false);
+  assert.equal(c.message.textContent, '');
+});
+
+test('Midjourney-Hochformat funktioniert nach Import ohne geänderte Druckvorgaben', async () => {
+  const { c, importImage } = setup({ sourceWidth: 1904, sourceHeight: 2544 });
+  await importImage();
+  assert.equal(c.render.disabled, false);
+  assert.equal(c.canvas.hidden, false);
+  assert.equal(c.message.textContent, '');
+  assert.match(c.dimensions.textContent, /3307 × 4419 px/);
+  await c.render.fire('click');
+  assert.equal(c.download.hidden, false);
 });
 
 test('Fehlgeschlagener Neuimport gibt kein altes Ergebnis frei', async () => {

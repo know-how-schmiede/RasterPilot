@@ -9,7 +9,7 @@ Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch i
 - Ein eigenes System für RasterPilot: Das Skript ersetzt die aktivierte Nginx-Standardseite und belegt Port 80. Es ist nicht für einen bereits anderweitig eingerichteten Webserver gedacht.
 - Das GitHub-Repository muss für diesen Installationsweg öffentlich sein. Prüfen lässt sich das durch Öffnen von `https://github.com/know-how-schmiede/RasterPilot` in einem privaten Browserfenster ohne GitHub-Anmeldung. Für die Python-Pakete wird ebenfalls Internetzugang benötigt.
 
-Das Skript installiert Flask, Pillow (ab 12.2, kleiner 13) und NumPy (ab 2.2, kleiner 3) in der eigenen Python-Umgebung. Auf dem Debian-System wird Python 3.13 verwendet; lokal ist Python ab 3.11 unterstützt. Die neue Verarbeitung wurde bislang unter Windows/Python 3.12 automatisiert geprüft; eine vollständige Debian-13-Prüfung der Rasterung und eine Speichermessung im 4-GB-LXC stehen noch aus.
+Das Skript installiert Flask, Pillow (ab 12.2, kleiner 13) und NumPy (ab 2.2, kleiner 3) in der eigenen Python-Umgebung. Auf dem Debian-System wird Python 3.13 verwendet; lokal ist Python ab 3.11 unterstützt. Der Anwender hat Neuinstallation, Bildimport und Rasterung im Debian-LXC als funktionierend bestätigt. Automatisierte Verarbeitungstests laufen zusätzlich unter Windows/Python 3.12; eine vollständige Debian-13-Prüfung und eine Speichermessung unter paralleler Last im 4-GB-LXC stehen noch aus.
 
 Die folgenden Befehle sind für `root` geschrieben und benötigen beim Aufruf kein `sudo`. Bei einer Konsole wie `root@RasterPilot:~#` bereits direkt fortfahren. Als anderer Benutzer zuerst `su -` ausführen und das root-Passwort eingeben. Jeden Befehlsblock vollständig kopieren und ausführen.
 
@@ -71,7 +71,7 @@ install -m 755 /tmp/rasterpilot-update.sh /usr/local/bin/rasterpilot-update &&
 
 Sobald Version 0.2.0 auf GitHub veröffentlicht ist, zunächst `rasterpilot-update` ausführen. Ein bereits vor der Rechtekorrektur installiertes Updateskript muss vorher wie unten im Abschnitt zum 502-Fehler beschrieben ersetzt werden.
 
-Ab 0.2.0 werden Bilder zur Berechnung an den eigenen Server übertragen und im Arbeitsspeicher verarbeitet. Dateien dürfen 20 MiB und 40 Megapixel, Ausgaben 12 Megapixel und 12000 Pixel je Kante nicht überschreiten. Eine Berechnung bindet derzeit einen Webprozess; eine Warteschlange und ein separater Worker folgen später. Originale und Ergebnisse werden nicht als Dateien gespeichert. Nginx muss für diesen Ablauf ebenfalls angepasst werden; ein Quellcodeupdate allein ändert dessen Konfiguration nicht.
+Ab 0.2.0 werden Bilder zur Berechnung an den eigenen Server übertragen und im Arbeitsspeicher verarbeitet. Dateien dürfen 20 MiB und 40 Megapixel nicht überschreiten; Ausgaben sind seit 0.2.2 auf 40 Megapixel und 12000 Pixel je Kante begrenzt (zuvor 12 Megapixel). Eine Berechnung bindet derzeit einen Webprozess; eine Warteschlange und ein separater Worker folgen später. Originale und Ergebnisse werden nicht als Dateien gespeichert. Bei Installationen von vor 0.2.0 muss Nginx für diesen Ablauf ebenfalls angepasst werden; ein Quellcodeupdate allein ändert dessen Konfiguration nicht.
 
 Bei einer bestehenden Installation als root die Konfiguration sichern und öffnen:
 
@@ -96,6 +96,20 @@ nginx -t && systemctl reload nginx
 ```
 
 Neue Installationen über das aktuelle Installationsskript enthalten diese Einstellungen bereits. Danach die Browserseite neu laden, ein PNG/JPEG importieren, Raster berechnen und Download sowie 100-%-Ansicht prüfen. Eine Datei über 1 MiB zusätzlich testen, um das frühere Nginx-Standardlimit auszuschließen. Eine lokal erzeugte, reproduzierbare Laufzeit-/Speichermessung ist mit `/opt/rasterpilot/current/venv/bin/python /opt/rasterpilot/current/source/scripts/benchmark_processing.py` möglich; das Skript verwendet ausschließlich synthetische Bilddaten.
+
+### Update auf 0.2.2: Midjourney-Hochformate
+
+Die bisherige Exportgrenze konnte ein bereits erfolgreich importiertes Bild mit der Vorgabe von 28 cm Breite und 300 ppi blockieren. Version 0.2.2 erhöht sie von 12 auf 40 Megapixel. Die drei bereitgestellten Originale mit je 1904 × 2544 Pixeln ergeben 3307 × 4419 Ausgabepixel und funktionieren damit ohne vorheriges Verkleinern.
+
+Nach Veröffentlichung als root `/usr/local/bin/rasterpilot-update` ausführen und die Browserseite vollständig neu laden, etwa mit Strg+F5. Wer die aktuelle Nginx-Konfiguration bereits verwendet oder ab 0.2.0 neu installiert hat, benötigt keine erneute Nginx-Anpassung und keine Neuinstallation. Uploadgrenzen und HTTP-Zeitlimits bleiben unverändert.
+
+Ein synthetischer Test nahe der neuen Exportgrenze ist möglich mit:
+
+```sh
+/opt/rasterpilot/current/venv/bin/python /opt/rasterpilot/current/source/scripts/benchmark_processing.py --width-cm 53.44
+```
+
+`--source-side 6000 --pattern gradient` prüft zusätzlich ein großes dekodiertes Original. Den Test bei freiem System ausführen, um eine einzelne Berechnung zu messen. Lokale Windows-Messungen stehen in der [Architektur](ARCHITEKTUR.md); sie ersetzen keinen parallelen Lasttest im LXC.
 
 ## Status und Fehlerbehebung
 

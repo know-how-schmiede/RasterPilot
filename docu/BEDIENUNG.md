@@ -16,7 +16,9 @@ Die Verarbeitung und das PNG-Ergebnis verwenden 8 Bit pro Kanal. 16-Bit-Graustuf
 
 Links/Oben/Breite/Höhe beschreiben den Ausschnitt in Pixeln des orientierten Originals. Der Ausschnitt wird vor der endgültigen Skalierung genommen. „Ausschnitt zurücksetzen“ stellt das ganze Motiv wieder her. Das Original wird nicht überschrieben.
 
-Ein Export darf derzeit höchstens 12 Megapixel und 12000 Pixel je Kante haben. Überschreitungen werden vor der Berechnung gemeldet. Druckbreite oder Auflösung reduzieren, um innerhalb der Grenze zu bleiben. Sehr kleine Ausschnitte können beim Vergrößern sichtbar unscharf werden.
+Ein Export darf seit 0.2.2 höchstens 40 Megapixel und 12000 Pixel je Kante haben. Ein Midjourney-Hochformat mit 1904 × 2544 Pixeln ergibt bei 28 cm Breite und 300 ppi beispielsweise 3307 × 4419 Pixel (etwa 14,6 Megapixel). Es kann unverändert importiert und mit diesen Vorgaben gerastert werden.
+
+Die Exportgrenze bezieht sich auf die berechneten Druckmaße, nicht auf die Dateigröße oder die Pixelzahl des Originals. Bei Überschreitung bleibt der Originalausschnitt sichtbar und bearbeitbar; nur Berechnung und Download werden gesperrt. Druckbreite, Auflösung oder Ausschnitt innerhalb der Anwendung anpassen; eine extern verkleinerte Eingabedatei ist dafür nicht erforderlich. Sehr kleine Ausschnitte können beim Vergrößern sichtbar unscharf werden.
 
 ## 3. Raster berechnen
 

@@ -33,7 +33,7 @@ function invalidate() {
   updateView();
 }
 
-function parameters() {
+function parameters(checkOutput = true) {
   const values = fields.map(id => Number($(id).value));
   const [width, ppi, x, y, w, h, spacing, coverage] = values;
   const valid = image && fields.every(id => $(id).value !== '' && $(id).checkValidity()) &&
@@ -42,8 +42,8 @@ function parameters() {
   if (!valid) throw new Error('Bitte gültige Werte und einen Ausschnitt innerhalb des Bildes eingeben.');
   const pxWidth = Math.max(1, Math.round(width / 2.54 * ppi));
   const pxHeight = Math.max(1, Math.round(pxWidth * h / w));
-  if (pxWidth * pxHeight > 12000000 || Math.max(pxWidth, pxHeight) > 12000) {
-    throw new Error('Der Export ist auf 12 Megapixel und 12000 Pixel je Kante begrenzt. Bitte Druckbreite oder Auflösung verringern.');
+  if (checkOutput && (pxWidth * pxHeight > 40000000 || Math.max(pxWidth, pxHeight) > 12000)) {
+    throw new Error('Die gewählte Druckgröße ergibt mehr als 40 Megapixel oder 12000 Pixel je Kante. Bitte Druckbreite oder Auflösung verringern; das Originalbild kann unverändert bleiben.');
   }
   if (spacing / 25.4 * ppi < 2) throw new Error('Der Rasterabstand muss bei dieser Auflösung mindestens zwei Pixel betragen.');
   return { width_cm: width, ppi, x, y, crop_width: w, crop_height: h, spacing_mm: spacing, coverage };
@@ -62,7 +62,7 @@ function updateView() {
 function renderOriginal() {
   if (!image) return;
   try {
-    const p = parameters();
+    const p = parameters(false);
     const pw = Math.max(1, Math.round(p.width_cm / 2.54 * p.ppi));
     const ph = Math.max(1, Math.round(pw * p.crop_height / p.crop_width));
     $('dimensions').textContent = `${(p.width_cm * p.crop_height / p.crop_width).toFixed(2)} cm hoch · ${pw} × ${ph} px`;
@@ -78,6 +78,8 @@ function renderOriginal() {
     $('render').disabled = false;
     $('render').dataset.valid = '1';
     message('');
+    // Das Original bleibt auch bei zu großen Exportmaßen zum Zuschneiden sichtbar.
+    try { parameters(); } catch (error) { $('render').disabled = true; message(error.message); }
   } catch (error) {
     message(error.message);
     $('dimensions').textContent = '';

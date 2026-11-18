@@ -10,7 +10,7 @@ from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
 
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_INPUT_PIXELS = 40_000_000
-MAX_OUTPUT_PIXELS = 12_000_000
+MAX_OUTPUT_PIXELS = 40_000_000
 MAX_OUTPUT_SIDE = 12_000
 SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB'))
 
@@ -118,7 +118,7 @@ class Parameters:
         w = max(1, math.floor(self.width_cm / 2.54 * self.ppi + 0.5))
         h = max(1, math.floor(w * self.crop_height / self.crop_width + 0.5))
         if w * h > MAX_OUTPUT_PIXELS or max(w, h) > MAX_OUTPUT_SIDE:
-            raise ImageError('Der Export ist auf 12 Megapixel und 12000 Pixel je Kante begrenzt. Bitte Druckbreite oder Auflösung verringern.')
+            raise ImageError('Die gewählte Druckgröße ergibt mehr als 40 Megapixel oder 12000 Pixel je Kante. Bitte Druckbreite oder Auflösung verringern; das Originalbild kann unverändert bleiben.')
         return w, h
 
 

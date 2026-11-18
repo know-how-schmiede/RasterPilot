@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">RasterPilot Logo</title>
+  <desc id="desc">Abgerundetes dunkelblaues Quadrat mit einem türkisfarbenen Halbtonraster und einem stilisierten Papierflieger.</desc>
+  <rect width="256" height="256" rx="56" fill="#10243a"/>
+  <g fill="#55e0ce">
+    <circle cx="48" cy="55" r="4"/><circle cx="76" cy="55" r="5"/><circle cx="104" cy="55" r="6"/><circle cx="132" cy="55" r="7"/>
+    <circle cx="48" cy="83" r="5"/><circle cx="76" cy="83" r="6"/><circle cx="104" cy="83" r="7"/><circle cx="132" cy="83" r="8"/>
+    <circle cx="48" cy="111" r="6"/><circle cx="76" cy="111" r="7"/><circle cx="104" cy="111" r="8"/>
+    <circle cx="48" cy="139" r="7"/><circle cx="76" cy="139" r="8"/><circle cx="104" cy="139" r="9"/>
+    <circle cx="48" cy="167" r="8"/><circle cx="76" cy="167" r="9"/><circle cx="104" cy="167" r="10"/>
+    <circle cx="48" cy="195" r="9"/><circle cx="76" cy="195" r="10"/><circle cx="104" cy="195" r="11"/>
+  </g>
+  <path d="M104 143 213 49l-43 149-29-43-37-12Z" fill="#fff"/>
+  <path d="m141 155 72-106-95 101z" fill="#a2f3e7"/>
+  <path d="m141 155 2 33 14-19z" fill="#55e0ce"/>
+</svg>

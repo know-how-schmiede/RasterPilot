@@ -7,9 +7,9 @@ Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch i
 - Debian 13 mit Internetzugang und mindestens 2 CPU-Kernen sowie 4 GB RAM als vorläufige Empfehlung.
 - Zugang zur Konsole als `root` oder als Benutzer mit `sudo`-Rechten. Im Proxmox-LXC kann die Konsole über die Proxmox-Oberfläche geöffnet werden.
 - Ein eigenes System für RasterPilot: Das Skript ersetzt die aktivierte Nginx-Standardseite und belegt Port 80. Es ist nicht für einen bereits anderweitig eingerichteten Webserver gedacht.
-- Das GitHub-Repository muss öffentlich sein. Für die Python-Pakete wird ebenfalls Internetzugang benötigt.
+- Das GitHub-Repository muss für diesen Installationsweg öffentlich sein. Prüfen lässt sich das durch Öffnen von `https://github.com/know-how-schmiede/RasterPilot` in einem privaten Browserfenster ohne GitHub-Anmeldung. Für die Python-Pakete wird ebenfalls Internetzugang benötigt.
 
-Die folgenden Befehle sind für `root` geschrieben. Als anderer Benutzer jedem Befehl `sudo` voranstellen. Jede Zeile einzeln ausführen; eine Passwortabfrage bei `sudo` ist normal.
+Die folgenden Befehle sind für `root` geschrieben. Als anderer Benutzer jedem Befehl `sudo` voranstellen. Jeden Befehlsblock vollständig kopieren und ausführen; eine Passwortabfrage bei `sudo` ist normal.
 
 ## Installation
 
@@ -23,11 +23,11 @@ apt install -y curl ca-certificates
 Das Installationsskript herunterladen und ausführen:
 
 ```sh
-curl -fL https://raw.githubusercontent.com/know-how-schmiede/RasterPilot/main/scripts/install.sh -o /tmp/rasterpilot-install.sh
+curl -fL https://raw.githubusercontent.com/know-how-schmiede/RasterPilot/main/scripts/install.sh -o /tmp/rasterpilot-install.sh &&
 sh /tmp/rasterpilot-install.sh
 ```
 
-Bei einem Benutzer mit `sudo` lautet die letzte Zeile `sudo sh /tmp/rasterpilot-install.sh`. Die Installation kann einige Minuten dauern. Sie verwendet den aktuellen Stand des Standard-Branches des öffentlichen Repositories. Bei einer Fehlermeldung den angezeigten Fehler beheben und das Skript erneut ausführen; meldet es eine bestehende Installation, siehe Fehlerbehebung.
+Das `&&` führt das Skript nur aus, wenn der Download erfolgreich war. Bei einem Benutzer mit `sudo` lautet die letzte Zeile `sudo sh /tmp/rasterpilot-install.sh`. Die Installation kann einige Minuten dauern. Sie verwendet den aktuellen Stand des Standard-Branches des öffentlichen Repositories. Bei einer Fehlermeldung den angezeigten Fehler beheben und das Skript erneut ausführen; meldet es eine bestehende Installation, siehe Fehlerbehebung.
 
 Die Serveradresse anzeigen:
 
@@ -50,6 +50,47 @@ sudo rasterpilot-update
 Als `root` entfällt `sudo`. Das Skript lädt den aktuellen Stand des Standard-Branches, installiert ihn in einer neuen Umgebung und startet den Dienst neu. Während des Neustarts ist die Anwendung kurz nicht erreichbar. Bei einem fehlgeschlagenen Start versucht das Skript, die vorherige Version wiederherzustellen. Alte Versionen bleiben unter `/opt/rasterpilot/releases` erhalten und belegen Speicherplatz. Das Update kann spätere Anpassungen an Nginx oder dem systemd-Dienst nicht automatisch übernehmen; Hinweise zu solchen Änderungen stehen gegebenenfalls in der jeweiligen Veröffentlichung.
 
 ## Status und Fehlerbehebung
+
+### Download meldet HTTP 404
+
+`curl: (22) The requested URL returned error: 404` bedeutet, dass GitHub das Installationsskript unter der angegebenen Adresse nicht öffentlich bereitstellt. Bei einem privaten Repository liefert GitHub für anonyme Zugriffe ebenfalls 404. Die anschließende Meldung `cannot open /tmp/rasterpilot-install.sh` ist ein Folgefehler: Das Skript wurde nicht heruntergeladen und die Installation hat noch nicht begonnen.
+
+1. `https://github.com/know-how-schmiede/RasterPilot` ohne GitHub-Anmeldung öffnen. Ist das Repository nur nach der Anmeldung sichtbar, muss der Eigentümer es für diesen Installationsweg öffentlich machen. In GitHub erfolgt dies unter **Settings → General → Danger Zone → Change repository visibility**. Vorher prüfen, dass die Veröffentlichung der Inhalte beabsichtigt ist.
+2. Ist das Repository öffentlich erreichbar, auf dem Branch `main` prüfen, ob `scripts/install.sh` vorhanden ist. Lokale Änderungen müssen zuerst auf GitHub veröffentlicht werden. Bei einer Umbenennung von Eigentümer, Repository oder Branch muss die Downloadadresse entsprechend angepasst werden.
+3. Danach den vollständigen Download- und Ausführungsblock aus dem Abschnitt „Installation“ erneut ausführen. Solange der Download fehlschlägt, `sh /tmp/rasterpilot-install.sh` nicht einzeln starten.
+
+Ein privates Repository wird durch die aktuelle anonyme Download- und Installationsanleitung nicht unterstützt; auch das anschließende Klonen durch das Skript benötigt Zugriff auf das Repository.
+
+### Nginx meldet „502 Bad Gateway“
+
+Nginx ist erreichbar, erhält aber keine gültige Antwort von der Anwendung auf `127.0.0.1:8000`. Zuerst den Dienst und dessen Fehlermeldungen prüfen:
+
+```sh
+systemctl status rasterpilot --no-pager -l
+journalctl -u rasterpilot -n 50 --no-pager
+```
+
+Bei Installationen mit der ursprünglichen Skriptversion kann das Versionsverzeichnis nur für root zugänglich sein (`700`). Dann kann der Benutzer `rasterpilot` Gunicorn nicht ausführen; das Dienstprotokoll kann `Permission denied` beziehungsweise `status=203/EXEC` enthalten. Als root lässt sich die aktive Version so korrigieren und neu starten:
+
+```sh
+chmod 755 "$(readlink -f /opt/rasterpilot/current)" &&
+systemctl restart rasterpilot
+curl --retry 5 --retry-delay 1 --retry-connrefused --fail --show-error http://127.0.0.1:8000/health
+curl --fail --show-error http://127.0.0.1/health
+```
+
+Beide Abfragen sollen eine JSON-Antwort mit `"status":"ok"` liefern. Anschließend die Browserseite neu laden. Schlägt die direkte Abfrage auf Port 8000 weiter fehl, das Dienstprotokoll erneut prüfen. Funktioniert sie, aber die Abfrage über Port 80 scheitert, zusätzlich `nginx -t` und `tail -n 50 /var/log/nginx/error.log` prüfen.
+
+Neue Installations- und Update-Skripte setzen das Versionsverzeichnis auf `755` und prüfen die Anwendung vor dem Aktivieren als Dienstbenutzer. Ein bereits installiertes `rasterpilot-update` enthält die Korrektur erst, wenn es ersetzt wurde. Sobald die korrigierte Skriptversion auf GitHub veröffentlicht ist, als root ausführen:
+
+```sh
+curl -fL https://raw.githubusercontent.com/know-how-schmiede/RasterPilot/main/scripts/update.sh -o /tmp/rasterpilot-update.sh &&
+install -m 755 /tmp/rasterpilot-update.sh /usr/local/bin/rasterpilot-update
+```
+
+Danach verwenden künftige Aufrufe von `rasterpilot-update` das korrigierte Skript. Das Installationsskript muss zur Reparatur der bestehenden Installation nicht erneut ausgeführt werden.
+
+### Dienst und Netzwerk prüfen
 
 ```sh
 systemctl status rasterpilot

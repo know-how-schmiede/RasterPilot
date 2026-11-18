@@ -29,10 +29,11 @@ chown rasterpilot:rasterpilot /var/lib/rasterpilot
 release=$(mktemp -d "$BASE/releases/release.XXXXXXXX")
 cleanup() { if [ -n "$release" ]; then rm -rf "$release"; fi; }
 trap cleanup EXIT HUP INT TERM
+chmod 755 "$release"
 git clone --depth 1 "$REPO_URL" "$release/source"
 python3 -m venv "$release/venv"
 "$release/venv/bin/pip" install "$release/source" 'gunicorn>=23,<24'
-"$release/venv/bin/python" -c 'from rasterpilot import create_app; assert create_app().test_client().get("/health").status_code == 200'
+runuser -u rasterpilot -- "$release/venv/bin/python" -c 'from rasterpilot import create_app; assert create_app().test_client().get("/health").status_code == 200'
 ln -s "$release" "$BASE/current"
 release=''
 install -m 755 "$BASE/current/source/scripts/update.sh" /usr/local/bin/rasterpilot-update
@@ -72,6 +73,10 @@ systemctl daemon-reload
 systemctl enable --now rasterpilot
 systemctl enable nginx
 systemctl restart nginx
+if ! curl --retry 5 --retry-delay 1 --retry-connrefused --fail --silent --show-error http://127.0.0.1:8000/health >/dev/null; then
+    echo 'RasterPilot konnte nicht gestartet werden. Bitte systemctl status rasterpilot und journalctl -u rasterpilot -n 50 --no-pager prüfen.' >&2
+    exit 1
+fi
 curl --fail --silent --show-error http://127.0.0.1/health >/dev/null
 printf '\nRasterPilot ist installiert. Öffnen Sie http://<IP-Adresse-des-Servers>/ im Browser.\n'
 printf 'Die IP-Adresse finden Sie mit: hostname -I\n'

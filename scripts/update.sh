@@ -15,10 +15,11 @@ old=$(readlink -f "$BASE/current")
 release=$(mktemp -d "$BASE/releases/release.XXXXXXXX")
 cleanup() { if [ -n "$release" ]; then rm -rf "$release"; fi; }
 trap cleanup EXIT HUP INT TERM
+chmod 755 "$release"
 git clone --depth 1 "$REPO_URL" "$release/source"
 python3 -m venv "$release/venv"
 "$release/venv/bin/pip" install "$release/source" 'gunicorn>=23,<24'
-"$release/venv/bin/python" -c 'from rasterpilot import create_app; assert create_app().test_client().get("/health").status_code == 200'
+runuser -u rasterpilot -- "$release/venv/bin/python" -c 'from rasterpilot import create_app; assert create_app().test_client().get("/health").status_code == 200'
 ln -s "$release" "$BASE/current.new"
 mv -Tf "$BASE/current.new" "$BASE/current"
 if ! systemctl restart rasterpilot || ! curl --retry 5 --retry-delay 1 --retry-connrefused --fail --silent --show-error http://127.0.0.1:8000/health >/dev/null; then

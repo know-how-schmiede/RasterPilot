@@ -10,6 +10,10 @@ RasterPilot ist als deutschsprachige Web-App geplant, die Fotos und Grafiken in 
 
 > **Projektstatus:** Die erste Bildvorschau ist verfügbar. Halbtonraster, Export und Produktionsbetrieb sind noch in Planung.
 
+## Installation auf Debian 13
+
+Für eine einfache Installation direkt aus GitHub und spätere Updates siehe die [Installationsanleitung](docu/INSTALLATION_Debian13.md).
+
 ## Lokal starten
 
 Voraussetzung ist Python ab Version 3.11. Für den lokalen Entwicklungsstart:

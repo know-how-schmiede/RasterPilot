@@ -133,11 +133,81 @@ class ProcessingTest(unittest.TestCase):
         visible = array[:, :, 3] == 255
         self.assertTrue(np.all(array[visible, :3] == [255, 0, 0]))
 
+    def test_luminance_raster_has_monotonic_tones_and_exact_ink_color(self):
+        image = Image.new('RGBA', (256, 256))
+        for index, gray in enumerate((0, 64, 128, 255)):
+            image.paste((gray, gray, gray, 255), (index * 64, 0, (index + 1) * 64, 256))
+        for angle in (0, 33):
+            array, _, _ = self.result(image, mode='luminance', ink_color='#23aB81', angle_deg=angle)
+            counts = []
+            for index, gray in enumerate((0, 64, 128, 255)):
+                visible = array[:, index * 64:(index + 1) * 64, 3] == 255
+                self.assertAlmostEqual(visible.mean(), 1 - gray / 255, delta=0.02)
+                counts.append(visible.mean())
+            self.assertEqual(counts, sorted(counts, reverse=True))
+            np.testing.assert_array_equal(array[:, :64, 3], 255)
+            np.testing.assert_array_equal(array[:, 192:, 3], 0)
+            self.assertTrue(np.all(array[array[:, :, 3] == 255, :3] == [35, 171, 129]))
+
+    def test_luminance_weights_inversion_and_alpha_are_applied_once(self):
+        for color, brightness in (((255, 0, 0), 0.2126), ((0, 255, 0), 0.7152),
+                                  ((0, 0, 255), 0.0722), ((255, 255, 255), 1)):
+            image = Image.new('RGBA', (256, 256), (*color, 128))
+            image.paste((255, 0, 0, 0), (0, 0, 128, 256))
+            for invert in (False, True):
+                with self.subTest(color=color, invert=invert):
+                    array, _, _ = self.result(image, mode='luminance', invert=invert)
+                    self.assertTrue(np.all(array[:, :128, 3] == 0))
+                    tone = brightness if invert else 1 - brightness
+                    self.assertAlmostEqual((array[:, 128:, 3] == 255).mean(), tone * 128 / 255, delta=0.015)
+                    self.assertLessEqual(set(np.unique(array[:, :, 3])), {0, 255})
+
+    def test_luminance_black_white_points_and_gamma(self):
+        for gray, expected in ((0, 1), (64, 1), (128, 0.5), (192, 0), (255, 0)):
+            image = Image.new('RGBA', (256, 256), (gray, gray, gray, 255))
+            array, _, _ = self.result(image, mode='luminance', black_point=64, white_point=192)
+            self.assertAlmostEqual((array[:, :, 3] == 255).mean(), expected, delta=0.012)
+        image = Image.new('RGBA', (256, 256), (128, 128, 128, 255))
+        amounts = []
+        for gamma in (0.5, 1, 2):
+            array, _, _ = self.result(image, mode='luminance', black_point=64, white_point=192, gamma=gamma)
+            amount = (array[:, :, 3] == 255).mean()
+            self.assertAlmostEqual(amount, 1 - 0.5 ** (1 / gamma), delta=0.012)
+            amounts.append(amount)
+        self.assertEqual(amounts, sorted(amounts, reverse=True))
+
+    def test_alpha_mode_preserves_opaque_interior_colors_and_soft_alpha_area(self):
+        image = Image.new('RGBA', (256, 256), (12, 134, 231, 0))
+        for index, alpha in enumerate((0, 64, 128, 255)):
+            image.paste((12, 134, 231, alpha), (index * 64, 0, (index + 1) * 64, 256))
+        for angle in (0, -33):
+            array, _, _ = self.result(image, mode='alpha', coverage=0, angle_deg=angle,
+                                     black_point=64, white_point=192, gamma=2, invert=True)
+            for index, alpha in enumerate((0, 64, 128, 255)):
+                visible = array[:, index * 64:(index + 1) * 64, 3] == 255
+                self.assertAlmostEqual(visible.mean(), alpha / 255, delta=0.025)
+            self.assertTrue(np.all(array[:, 192:, 3] == 255))
+            self.assertTrue(np.all(array[array[:, :, 3] == 255, :3] == [12, 134, 231]))
+            self.assertLessEqual(set(np.unique(array[:, :, 3])), {0, 255})
+
+    def test_new_settings_defaults_preserve_color_mode(self):
+        image = Image.new('RGBA', (256, 256), (12, 134, 231, 128))
+        original, _, _ = self.result(image)
+        explicit, _, _ = self.result(image, mode='color', ink_color='#abcdef', invert=True,
+                                     black_point=64, white_point=192, gamma=2)
+        np.testing.assert_array_equal(original, explicit)
+
     def test_invalid_parameters_and_limits(self):
         for changes in (dict(width_cm=float('nan')), dict(coverage=float('inf')),
                         dict(ppi=True), dict(ppi=100.5), dict(width_cm='28'),
                         dict(angle_deg=-181), dict(angle_deg=181), dict(angle_deg=True),
                         dict(angle_deg='45'), dict(angle_deg=None), dict(angle_deg=float('nan')),
+                        dict(mode='unknown'), dict(mode=None), dict(mode=[]),
+                        dict(ink_color='red'), dict(ink_color='#fff'), dict(ink_color=None),
+                        dict(invert=1), dict(invert='false'), dict(black_point=255),
+                        dict(black_point=128, white_point=128), dict(black_point=200, white_point=100),
+                        dict(black_point=0.5), dict(white_point=True), dict(gamma=0),
+                        dict(gamma=6), dict(gamma=float('nan')),
                         dict(width_cm=200, ppi=1200), dict(spacing_mm=0.1, ppi=36),
                         dict(coverage=101), dict(width_cm=10 ** 1000)):
             with self.subTest(changes=changes), self.assertRaises(ImageError):

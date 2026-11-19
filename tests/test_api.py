@@ -105,11 +105,33 @@ class ImageApiTest(unittest.TestCase):
         for data in ({}, {'parameters': '{}'},
                      {'parameters': '[]', 'image': (BytesIO(b'bad'), 'fake.png')},
                      {**self.data(), 'parameters': 'broken JSON'},
-                     self.data(coverage=150), self.data(angle_deg=181)):
+                     self.data(coverage=150), self.data(angle_deg=181), self.data(mode='unknown'),
+                     self.data(mode='luminance', gamma=0), self.data(mode='luminance', ink_color='red'),
+                     self.data(mode='luminance', black_point=200, white_point=100)):
             with self.subTest():
                 response = self.client.post('/api/render', data=data, headers=self.headers)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn('error', response.json)
+
+    def test_new_modes_return_complete_png_and_keep_export_name(self):
+        for mode in ('luminance', 'alpha'):
+            with self.subTest(mode=mode):
+                data = self.data(mode=mode, ink_color='#ab421c')
+                with Image.new('RGBA', (256, 128), (0, 0, 0, 255)) as source:
+                    source.paste((0, 0, 0, 0), (0, 0, 128, 128))
+                    data['image'] = (encoded(source, format='PNG'), 'original.png')
+                response = self.client.post('/api/render', data=data, headers=self.headers)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(unquote(response.headers['X-Download-Name']), 'original_rp_25.4_256ppi_0G.png')
+                with Image.open(BytesIO(response.data)) as result:
+                    array = np.array(result)
+                    self.assertEqual(result.size, (256, 128))
+                    self.assertAlmostEqual(result.info['dpi'][0], 256, delta=0.02)
+                    self.assertIn('icc_profile', result.info)
+                    self.assertTrue(np.all(array[:, :128, 3] == 0))
+                    self.assertTrue(np.all(array[:, 128:, 3] == 255))
+                    self.assertTrue(np.all(array[:, 128:, :3] == ([171, 66, 28] if mode == 'luminance' else [0, 0, 0])))
+                response.close()
 
     def test_request_size_limit_is_json(self):
         self.app.config['MAX_CONTENT_LENGTH'] = 128

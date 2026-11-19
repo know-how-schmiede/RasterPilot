@@ -8,7 +8,7 @@ Vom Bild zum druckfertigen Halbtonraster.
 
 RasterPilot ist als deutschsprachige Web-App geplant, die Fotos und Grafiken in Halbtonraster für DTF-Druckvorlagen umwandelt. Dabei entstehen Rasterpunkte mit transparenten Zwischenräumen. Die Anwendung soll auf Desktop und Tablet im Browser bedient werden und ohne GPU auskommen.
 
-> **Projektstatus:** Farbiges Auflockern und transparenter PNG-Export sind als experimenteller Ablauf verfügbar. Weitere Rastermodi, Hintergrund-Worker und Druckkalibrierung folgen.
+> **Projektstatus:** Farbiges Auflockern, einfarbiges Helligkeitsraster mit manuellen Tonwerten, Transparenzraster und transparenter PNG-Export sind als experimenteller Ablauf verfügbar. Hintergrund-Worker und Druckkalibrierung folgen.
 
 ## Installation auf Debian 13
 
@@ -27,7 +27,7 @@ flask --app rasterpilot:create_app run
 
 Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen. Die Oberflächen-Zustandstests benötigen zusätzlich Node.js und laufen mit `node --test tests/test_ui.cjs`; die isolierten Installations-/Updatetests mit `node --test tests/test_install_scripts.cjs` benötigen außerdem eine POSIX-Shell (unter Windows Git Bash). Node.js wird für den Betrieb der Anwendung nicht benötigt.
 
-Der aktuelle Ablauf importiert PNG/JPEG, berücksichtigt EXIF-Orientierung und Farbprofile und verarbeitet immer das vollständige Bild. Druckgrößenberechnung, farbige Rasterung mit einstellbarem Winkel (−180° bis +180°, Vorgabe 0°) sowie PNG-Export mit sRGB-Profil, binärem Alpha und ppi-Metadaten sind verfügbar. Originalvergleich, 100-%-Ergebnisansicht, Transparenzraster und Textilfarbe helfen beim Prüfen. Die [Bedienungsanleitung](docu/BEDIENUNG.md) erklärt die Schritte und Grenzen.
+Der aktuelle Ablauf importiert PNG/JPEG, berücksichtigt EXIF-Orientierung und Farbprofile und verarbeitet immer das vollständige Bild. Druckgrößenberechnung, drei Rastermodi mit einstellbarem Winkel (−180° bis +180°, Vorgabe 0°) sowie PNG-Export mit sRGB-Profil, binärem Alpha und ppi-Metadaten sind verfügbar. Im einfarbigen Modus lassen sich Druckfarbe, Umkehrung, Schwarz-/Weißpunkt und Gamma einstellen. Das Transparenzraster erhält deckende Motivbereiche. Originalvergleich, 100-%-Ergebnisansicht, Transparenzraster als Ansichtshilfe und Textilfarbe helfen beim Prüfen. Die [Bedienungsanleitung](docu/BEDIENUNG.md) erklärt die Schritte und Grenzen.
 
 Bilder werden an den eigenen RasterPilot-Server übertragen und dort im Arbeitsspeicher verarbeitet; es gibt keine Projekt- oder Bildablage. Eingaben sind auf 20 MiB/40 Megapixel, Ausgaben seit 0.2.2 auf 40 Megapixel/12000 Pixel je Kante begrenzt. Midjourney-Hochformate mit 1904 × 2544 Pixeln funktionieren damit auch bei der Vorgabe von 28 cm Breite und 300 ppi ohne vorheriges Verkleinern. Die höhere Exportauflösung entsteht erst bei der Berechnung der Druckgröße. Der Rasterabstand muss mindestens zwei Ausgabepixel betragen. Ohne eingebettetes Profil gilt eine angezeigte sRGB-Annahme; unlesbare Profile und CMYK ohne Profil werden abgewiesen. Alle Druckeinstellungen sind unkalibriert, die Vorschau ist keine Druckfreigabe. Installationen von vor 0.2.0 benötigen für Uploads über 1 MiB die [Nginx-Anpassung für 0.2.0](docu/INSTALLATION_Debian13.md#bestehende-installation-auf-020-umstellen).
 

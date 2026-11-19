@@ -1,5 +1,16 @@
 # Timeline
 
+## 0.3.0 – 19. November 2026
+
+- Anwender bestätigt die Exportbenennung und beauftragt den nächsten Punkt des Etappenplans. Weitere Rastermodi als nächste Entwicklungsstufe umgesetzt.
+- „Einfarbig nach Helligkeit“ mit frei wählbarer Druckfarbe und Umkehrung ergänzt. Schwarzpunkt, Weißpunkt und Gamma steuern die Helligkeitsmaske unter „Erweitert · Tonwerte“; neutrale Vorgaben und Zurücksetzen sind verfügbar.
+- „Transparenz rastern“ ergänzt: weiche Transparenz wird gerastert, vollständig deckende Innenbereiche bleiben gefüllt und die Originalfarben erhalten. Alpha wird in allen Modi genau einmal angewendet; der Export bleibt binär.
+- „Farbig auflockern“ bleibt die Vorgabe. Deckung, Druckfarbe und Tonwertfelder erscheinen nur in den passenden Modi. Neue Einstellungen und Moduswechsel entwerten bisherige Ergebnisse und Downloads. Ganzbildverarbeitung und gewünschtes Dateinamensschema bleiben erhalten.
+- Unnötige Alpha-Konvertierung bei unveränderter Pixelgröße vermieden, um die ursprünglichen Farben exakt zu erhalten.
+- Reproduzierbares Benchmarkskript um `--mode` ergänzt. Synthetische Standardausgabe lokal mit 178,5 MiB Prozessspeicherspitze im Helligkeitsmodus und 202,9 MiB im Transparenzmodus gemessen; Details und Messgrenzen in der Architektur dokumentiert.
+- 37 Python-Tests und zwölf JavaScript-Zustandstests erfolgreich. Vorhandenes Original in beiden neuen Modi bei Standard-Druckgröße und 45° über die API geprüft; synthetische Vergleichstafel visuell geprüft. Browser-/Druckabnahme und LXC-Lasttest offen. Automatische Tonwerte und Entrauschung folgen separat.
+- README, Bedienung, Architektur und Roadmap nachgeführt. Installationsvoraussetzungen und Installations-/Updateskripte unverändert.
+
 ## 0.2.5 – 19. November 2026
 
 - Exportnamen auf den ursprünglichen Dateinamen ohne Endung mit dem Suffix `_rp_<Druckbreite in mm>_<Auflösung>ppi_<Winkel>G.png` umgestellt. Auf Anwenderwunsch Unterstriche anstelle der unter Windows unzulässigen Sternchen verwendet.

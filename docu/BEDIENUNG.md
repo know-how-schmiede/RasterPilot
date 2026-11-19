@@ -1,4 +1,4 @@
-# Bild vorbereiten, auflockern und als PNG speichern
+# Bild vorbereiten, rastern und als PNG speichern
 
 Die Einstellungen sind experimentell und noch nicht anhand eines Druckprofils kalibriert. RasterPilot erzeugt die Bildvorlage; Weißunterlegung, Separation und Druckeransteuerung übernimmt weiterhin die RIP-Software.
 
@@ -22,12 +22,25 @@ Die Exportgrenze bezieht sich auf die berechneten Druckmaße, nicht auf die Date
 
 ## 3. Raster berechnen
 
-Der erste Modus heißt „Farbig auflockern“. Bildfarben einschließlich Weiß bleiben erhalten, zwischen den Punkten entstehen transparente Lücken. Weiß wird nicht automatisch freigestellt.
+Unter „Rastermodus“ stehen drei Verfahren zur Wahl:
+
+- **Farbig auflockern:** Die bisherige Vorgabe. Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken; Weiß wird nicht automatisch freigestellt.
+- **Einfarbig nach Helligkeit:** Dunkle Bildstellen erzeugen mehr Druckfläche, helle weniger. „Druckfarbe“ bestimmt die Farbe aller Punkte, unabhängig von der Textilfarbe der Ansicht. Schwarz wird bei neutralen Tonwerten gefüllt, Weiß transparent. „Helligkeit umkehren“ kehrt diese Zuordnung um, beispielsweise für helle Druckfarbe auf dunklem Textil. Vorhandene Transparenz wird weiterhin berücksichtigt.
+- **Transparenz rastern:** Weiche Transparenz wird in deckende Punkte und transparente Lücken umgewandelt. Vollständig transparente Stellen bleiben leer, deckende Innenbereiche bleiben gefüllt. Bildfarben bleiben erhalten. Ohne vorhandene Transparenz entstehen keine Lücken. Die Deckung aus dem Farbmodus wird hier nicht zusätzlich angewendet.
+
+Im Helligkeitsmodus öffnet „Erweitert · Tonwerte“ die manuelle Korrektur der Helligkeitsmaske:
+
+- **Schwarzpunkt (0–254):** Helligkeiten bis zu diesem Wert gelten als Schwarz. Höhere Werte vergrößern im normalen Modus die Druckfläche.
+- **Weißpunkt (1–255):** Helligkeiten ab diesem Wert gelten als Weiß. Niedrigere Werte verringern im normalen Modus die Druckfläche. Schwarzpunkt muss kleiner als Weißpunkt sein.
+- **Gamma (0,1–5):** Verändert die mittleren Tonwerte. Über 1 entsteht im normalen Modus weniger Druckfläche, unter 1 mehr. Bei Umkehr gilt die umgekehrte Wirkung.
+- **Tonwerte zurücksetzen:** Stellt Schwarzpunkt 0, Weißpunkt 255 und Gamma 1 wieder her.
+
+Die Tonwerte verändern ausschließlich die Helligkeitsmaske im einfarbigen Modus. Originalvergleich und andere Modi behalten ihre Farben. Automatische Tonwerte und Entrauschung sind noch nicht implementiert.
 
 - **Rasterabstand in mm:** Abstand der Punktmittelpunkte, kein Punktdurchmesser. Mindestens zwei Ausgabepixel Abstand sind erforderlich; das ist eine technische Abtastgrenze und keine geprüfte Mindestdruckgröße.
 - **Rasterwinkel in °:** Von −180° bis +180°, Vorgabe 0°. Positive Winkel drehen das Punktraster im Uhrzeigersinn um die linke obere Bildkante. Beispielsweise erzeugt 45° ein diagonales Raster. Das Motiv selbst wird weder gedreht noch beschnitten; Pixelmaße und Rasterabstand bleiben gleich.
-- **Deckung in %:** Mehr Deckung bedeutet mehr bedruckte Fläche. 0 % ergibt ein leeres Bild; 100 % füllt vollständig deckende Motivbereiche. Weiche Transparenz reduziert die lokale Punktfläche. Der exportierte Alphakanal bleibt dabei binär.
-- **Raster berechnen:** Überträgt das Original mit den Einstellungen erneut an den Server und erstellt das endgültige PNG. Änderungen an Druckgröße, Rasterabstand, Winkel oder Deckung entwerten das bisherige Ergebnis; danach erneut berechnen.
+- **Deckung in % (nur Farbig auflockern):** Mehr Deckung bedeutet mehr bedruckte Fläche. 0 % ergibt ein leeres Bild; 100 % füllt vollständig deckende Motivbereiche. Weiche Transparenz reduziert die lokale Punktfläche. Der exportierte Alphakanal bleibt in allen Modi binär.
+- **Raster berechnen:** Überträgt das Original mit den Einstellungen erneut an den Server und erstellt das endgültige PNG. Änderungen an Druckgröße, Rastermodus, Rasterabstand, Winkel, Deckung, Druckfarbe, Umkehrung oder Tonwerten entwerten das bisherige Ergebnis; danach erneut berechnen.
 
 Die Kreispunktfläche wird aus der Deckung bestimmt. Bei hohen Deckungen berühren sich die Punkte und die Lücken werden kleiner. Pixelrundung, kleine Rasterabstände und angeschnittene Motivkanten können von der theoretischen Deckung abweichen. Mindestpunkte und Mindestlücken werden noch nicht anhand eines Druckprofils geprüft.
 
@@ -43,6 +56,8 @@ Textilfarbe und Transparenzraster sind reine Ansichtshilfen. Änderungen daran e
 
 Die Datei enthält sRGB-Profil, Pixelmaße und Auflösungsmetadaten, aber weder Textilfarbe noch Schachbrett. Die berechnete Druckbreite in der RIP-Software kontrollieren und das bereits gerasterte Bild dort nicht nachträglich skalieren. Vor einer Produktion sind Testdruck und Kalibrierung erforderlich.
 
+Das Dateinamensschema bleibt in allen Modi gleich. Modus, Druckfarbe und Tonwerte sind nicht im Namen enthalten; Varianten bei Bedarf beim Speichern unterscheiden.
+
 ## Bei Fehlern
 
-Die Meldung im Bedienfeld erklärt Bild- und Parameterfehler. HTTP 413 beim Import kann bei älteren Installationen auf das Nginx-Uploadlimit hinweisen; siehe [Installation und Update](INSTALLATION_Debian13.md#bestehende-installation-auf-020-umstellen). Bei Serverfehlern das Dienstprotokoll prüfen. Eine abgebrochene Browseranfrage kann serverseitig noch bis zum Abschluss ihrer begrenzten Berechnung laufen. Eine Warteschlange, gespeicherte Einstellungen, weitere Rastermodi und Hintergrundberechnung folgen später.
+Die Meldung im Bedienfeld erklärt Bild- und Parameterfehler. HTTP 413 beim Import kann bei älteren Installationen auf das Nginx-Uploadlimit hinweisen; siehe [Installation und Update](INSTALLATION_Debian13.md#bestehende-installation-auf-020-umstellen). Bei Serverfehlern das Dienstprotokoll prüfen. Eine abgebrochene Browseranfrage kann serverseitig noch bis zum Abschluss ihrer begrenzten Berechnung laufen. Eine Warteschlange, gespeicherte Einstellungen und Hintergrundberechnung folgen später.

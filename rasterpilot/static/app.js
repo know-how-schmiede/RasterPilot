@@ -1,6 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const fields = ['width', 'ppi', 'spacing', 'coverage', 'angle'];
+const toneFields = ['black', 'white', 'gamma'];
 let image = null;
 let originalFile = null;
 let sourceWidth = 0;
@@ -34,18 +35,43 @@ function invalidate() {
 }
 
 function parameters(checkOutput = true) {
-  const values = fields.map(id => Number($(id).value));
-  const [width, ppi, spacing, coverage, angle] = values;
-  const valid = image && fields.every(id => $(id).value !== '' && $(id).checkValidity()) &&
-    values.every(Number.isFinite) && Number.isInteger(ppi);
+  const mode = $('mode').value;
+  const activeFields = fields.filter(id => id !== 'coverage' || mode === 'color');
+  if (mode === 'luminance') activeFields.push(...toneFields);
+  const valid = image && ['color', 'luminance', 'alpha'].includes(mode) &&
+    activeFields.every(id => $(id).value !== '' && $(id).checkValidity() && Number.isFinite(Number($(id).value))) &&
+    Number.isInteger(Number($('ppi').value));
   if (!valid) throw new Error('Bitte gültige Werte für Druckgröße und Raster eingeben.');
+  const [width, ppi, spacing, coverage, angle] = fields.map(id => Number($(id).value));
   const pxWidth = Math.max(1, Math.round(width / 2.54 * ppi));
   const pxHeight = Math.max(1, Math.round(pxWidth * sourceHeight / sourceWidth));
   if (checkOutput && (pxWidth * pxHeight > 40000000 || Math.max(pxWidth, pxHeight) > 12000)) {
     throw new Error('Die gewählte Druckgröße ergibt mehr als 40 Megapixel oder 12000 Pixel je Kante. Bitte Druckbreite oder Auflösung verringern; das Originalbild kann unverändert bleiben.');
   }
   if (spacing / 25.4 * ppi < 2) throw new Error('Der Rasterabstand muss bei dieser Auflösung mindestens zwei Pixel betragen.');
-  return { width_cm: width, ppi, spacing_mm: spacing, coverage, angle_deg: angle };
+  const p = { width_cm: width, ppi, spacing_mm: spacing, coverage: mode === 'color' ? coverage : 100, angle_deg: angle, mode };
+  if (mode === 'luminance') {
+    p.ink_color = $('ink').value;
+    p.invert = $('invert').checked;
+    [p.black_point, p.white_point, p.gamma] = toneFields.map(id => Number($(id).value));
+    if (!Number.isInteger(p.black_point) || !Number.isInteger(p.white_point) || p.black_point >= p.white_point) {
+      throw new Error('Der Schwarzpunkt muss kleiner als der Weißpunkt sein; beide müssen ganze Zahlen sein.');
+    }
+  }
+  return p;
+}
+
+function updateMode() {
+  const mode = $('mode').value;
+  const luminance = mode === 'luminance';
+  $('coverageControls').hidden = mode !== 'color';
+  $('coverage').disabled = mode !== 'color';
+  $('luminanceControls').hidden = !luminance;
+  for (const id of ['ink', 'invert', ...toneFields, 'resetTones']) $(id).disabled = !luminance;
+  $('modeInfo').textContent = mode === 'color' ?
+    'Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken.' : luminance ?
+    'Dunkle Bildstellen erzeugen mehr Druckfläche in der gewählten Druckfarbe. Vorhandene Transparenz bleibt berücksichtigt.' :
+    'Weiche Transparenz wird in deckende Punkte umgewandelt. Vollständig deckende Bereiche und die Bildfarben bleiben erhalten; ohne Transparenz entstehen keine Lücken.';
 }
 
 function updateView() {
@@ -176,4 +202,12 @@ $('render').addEventListener('click', async () => {
 });
 
 for (const id of fields) $(id).addEventListener('input', () => { invalidate(); renderOriginal(); });
+for (const id of ['mode', 'ink', 'invert', ...toneFields]) $(id).addEventListener('input', () => {
+  updateMode(); invalidate(); renderOriginal();
+});
+$('resetTones').addEventListener('click', () => {
+  $('black').value = '0'; $('white').value = '255'; $('gamma').value = '1';
+  invalidate(); renderOriginal();
+});
 for (const id of ['color', 'background', 'view', 'zoom']) $(id).addEventListener('input', updateView);
+updateMode();

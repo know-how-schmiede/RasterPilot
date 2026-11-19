@@ -46,6 +46,8 @@ def main():
                         help='Kantenlänge des synthetischen Originals (Standard: 2400 Pixel).')
     parser.add_argument('--pattern', choices=('noise', 'gradient'), default='noise',
                         help='Rauschen für PNG-Kompression oder Verlauf für große dekodierte Eingaben.')
+    parser.add_argument('--mode', choices=('color', 'luminance', 'alpha'), default='color',
+                        help='Rastermodus (Standard: color).')
     args = parser.parse_args()
     if args.source_side < 1 or args.source_side ** 2 > 40_000_000:
         parser.error('Das synthetische Original muss zwischen 1 Pixel und 40 Megapixel groß sein.')
@@ -66,11 +68,11 @@ def main():
     image, _ = load_image(source)
     with image:
         parameters = Parameters.from_dict(dict(width_cm=args.width_cm, ppi=300,
-            spacing_mm=1, coverage=65, angle_deg=0), image.size)
+            spacing_mm=1, coverage=65, angle_deg=0, mode=args.mode), image.size)
         with render_png(image, parameters) as result:
             output_bytes = result.getbuffer().nbytes
     print(json.dumps(dict(system=platform.platform(), python=platform.python_version(),
-        input_size=[args.source_side, args.source_side], pattern=args.pattern,
+        input_size=[args.source_side, args.source_side], pattern=args.pattern, mode=args.mode,
         output_size=parameters.output_size(), seconds=round(perf_counter() - start, 3),
         peak_process_mib=round(peak_mib(), 1), input_mib=round(input_bytes / 1024 ** 2, 2),
         output_mib=round(output_bytes / 1024 ** 2, 2)), ensure_ascii=False))

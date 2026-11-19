@@ -1,8 +1,9 @@
-"""Farbige Rasterung in endgültiger Druckgröße, ohne Dateisystemzugriffe."""
+"""Halbtonraster in endgültiger Druckgröße, ohne Dateisystemzugriffe."""
 
 from dataclasses import dataclass
 from io import BytesIO
 import math
+import re
 import warnings
 
 import numpy as np
@@ -85,11 +86,27 @@ class Parameters:
     spacing_mm: float
     coverage: float
     angle_deg: float
+    mode: str = 'color'
+    ink_color: str = '#000000'
+    invert: bool = False
+    black_point: int = 0
+    white_point: int = 255
+    gamma: float = 1
 
     @classmethod
     def from_dict(cls, values, size):
         if not isinstance(values, dict):
             raise ImageError('Die Rastereinstellungen müssen ein JSON-Objekt sein.')
+        values = dict(angle_deg=0, mode='color', ink_color='#000000', invert=False,
+                      black_point=0, white_point=255, gamma=1) | values
+        if values['mode'] not in ('color', 'luminance', 'alpha'):
+            raise ImageError('Bitte einen gültigen Rastermodus auswählen.')
+        if not isinstance(values['ink_color'], str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', values['ink_color']):
+            raise ImageError('Die Druckfarbe muss eine Farbe im Format #RRGGBB sein.')
+        if not isinstance(values['invert'], bool):
+            raise ImageError('Die Umkehrung muss ein Wahrheitswert sein.')
+        if values['mode'] != 'color':
+            values['coverage'] = 100
         w, h = size
         result = cls(
             _number(values, 'width_cm', 0.1, 200),
@@ -98,8 +115,16 @@ class Parameters:
             h,
             _number(values, 'spacing_mm', 0.1, 10),
             _number(values, 'coverage', 0, 100),
-            _number({'angle_deg': values.get('angle_deg', 0)}, 'angle_deg', -180, 180),
+            _number(values, 'angle_deg', -180, 180),
+            values['mode'],
+            values['ink_color'],
+            values['invert'],
+            _number(values, 'black_point', 0, 254, True),
+            _number(values, 'white_point', 1, 255, True),
+            _number(values, 'gamma', 0.1, 5),
         )
+        if result.black_point >= result.white_point:
+            raise ImageError('Der Schwarzpunkt muss kleiner als der Weißpunkt sein.')
         result.output_size()  # Grenzen vor Skalierung und Speicherreservierung prüfen.
         if result.spacing_px < 2:
             raise ImageError('Der Rasterabstand muss bei dieser Auflösung mindestens zwei Pixel betragen. Bitte Abstand oder Auflösung erhöhen.')
@@ -119,6 +144,8 @@ class Parameters:
 
 
 def _resize_rgba(image, size):
+    if image.size == size:
+        return image.copy()
     # Vormultipliziertes Alpha verhindert Farbsäume durch unsichtbare RGB-Werte.
     return image.convert('RGBa').resize(size, Image.Resampling.LANCZOS).convert('RGBA')
 
@@ -167,7 +194,17 @@ def render_png(image, parameters):
         with result.crop((0, start, size[0], end)) as band:
             pixels = np.array(band)
         # Alpha genau einmal in die gewünschte Deckung einbeziehen.
-        desired = pixels[:, :, 3].astype(np.float64) / 255 * (parameters.coverage / 100)
+        desired = pixels[:, :, 3].astype(np.float64) / 255
+        if parameters.mode == 'color':
+            desired *= parameters.coverage / 100
+        elif parameters.mode == 'luminance':
+            rgb = pixels[:, :, :3].astype(np.float64)
+            # Gewichtete sRGB-Helligkeit; Schwarz und Weiß bleiben exakt 0/255.
+            brightness = (2126 * rgb[:, :, 0] + 7152 * rgb[:, :, 1] + 722 * rgb[:, :, 2]) / 10000
+            tone = np.clip((brightness - parameters.black_point) /
+                           (parameters.white_point - parameters.black_point), 0, 1) ** (1 / parameters.gamma)
+            desired *= tone if parameters.invert else 1 - tone
+            pixels[:, :, :3] = tuple(int(parameters.ink_color[i:i + 2], 16) for i in (1, 3, 5))
         keep = (desired > 0) & ((desired >= 1) | (rank < desired))
         pixels[:, :, 3] = np.where(keep, 255, 0)
         pixels[~keep, :3] = 0

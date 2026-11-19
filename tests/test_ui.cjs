@@ -7,15 +7,17 @@ const { test } = require('node:test');
 function setup({ sourceWidth = 256, sourceHeight = 256,
   downloadName = 'motiv_rp_280_300ppi_0G.png' } = {}) {
   const controls = {};
-  const defaults = { width: '28', ppi: '300', angle: '0',
+  const defaults = { width: '28', ppi: '300', angle: '0', mode: 'color', ink: '#000000',
+    black: '0', white: '255', gamma: '1',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
-    'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes'];
+    'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
+    'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
       value: defaults[name] || '', dataset: {}, style: {}, hidden: ['result', 'canvas', 'download'].includes(name),
-      disabled: ['settings', 'viewSettings', 'zoom'].includes(name), textContent: '', files: [], attrs: {},
+      disabled: ['settings', 'viewSettings', 'zoom'].includes(name), checked: false, textContent: '', files: [], attrs: {},
       addEventListener(event, callback) { listeners[event] = callback; },
       fire(event) { return listeners[event]({ target: this }); },
       setAttribute(key, value) { this.attrs[key] = value; },
@@ -128,7 +130,7 @@ test('Vollständiges Bild wird ohne Ausschnittparameter angezeigt und übermitte
   assert.equal(c.canvas.drawArgs.length, 5);
   assert.deepEqual(c.canvas.drawArgs.slice(1), [0, 0, 1197, 1600]);
   await c.render.fire('click');
-  assert.deepEqual(submitted(), { width_cm: 28, ppi: 300, spacing_mm: 1, coverage: 65, angle_deg: 0 });
+  assert.deepEqual(submitted(), { width_cm: 28, ppi: 300, spacing_mm: 1, coverage: 65, angle_deg: 0, mode: 'color' });
   const html = readFileSync('rasterpilot/templates/index.html', 'utf8');
   assert.doesNotMatch(html, /Ausschnitt|id="(?:x|y|cropWidth|cropHeight|reset)"/);
   assert.match(html, /Originalbild/);
@@ -176,4 +178,73 @@ test('Fehlgeschlagener Neuimport gibt kein altes Ergebnis frei', async () => {
   assert.equal(c.download.hidden, true);
   assert.equal(c.result.hidden, true);
   assert.match(c.message.textContent, /20 MiB/);
+});
+
+test('Rastermodus zeigt passende Felder und übermittelt Helligkeitseinstellungen', async () => {
+  const { c, importImage, submitted } = setup();
+  await importImage();
+  assert.equal(c.luminanceControls.hidden, true);
+  assert.equal(c.ink.disabled, true);
+  await c.render.fire('click');
+  c.mode.value = 'luminance'; c.mode.fire('input');
+  assert.equal(c.download.hidden, true);
+  assert.equal(c.coverageControls.hidden, true);
+  assert.equal(c.coverage.disabled, true);
+  assert.equal(c.luminanceControls.hidden, false);
+  assert.equal(c.ink.disabled, false);
+  c.ink.value = '#aabbcc'; c.ink.fire('input');
+  c.invert.checked = true; c.invert.fire('input');
+  c.black.value = '20'; c.black.fire('input');
+  c.white.value = '220'; c.white.fire('input');
+  c.gamma.value = '1.5'; c.gamma.fire('input');
+  await c.render.fire('click');
+  assert.deepEqual(submitted(), { width_cm: 28, ppi: 300, spacing_mm: 1, coverage: 100, angle_deg: 0,
+    mode: 'luminance', ink_color: '#aabbcc', invert: true, black_point: 20, white_point: 220, gamma: 1.5 });
+  c.color.value = '#00ff00'; c.color.fire('input');
+  assert.equal(c.download.hidden, false);
+  c.gamma.value = '2'; c.gamma.fire('input');
+  assert.equal(c.download.hidden, true);
+});
+
+test('Ungültige Tonwerte sperren Berechnung; Zurücksetzen und Moduswechsel stellen sie wieder her', async () => {
+  const { c, importImage, submitted } = setup();
+  await importImage();
+  c.mode.value = 'luminance'; c.mode.fire('input');
+  c.black.value = '200'; c.black.fire('input');
+  c.white.value = '100'; c.white.fire('input');
+  assert.equal(c.render.disabled, true);
+  assert.match(c.message.textContent, /Schwarzpunkt/);
+  c.resetTones.fire('click');
+  assert.equal(c.black.value, '0');
+  assert.equal(c.white.value, '255');
+  assert.equal(c.gamma.value, '1');
+  assert.equal(c.render.disabled, false);
+  c.black.value = ''; c.black.fire('input');
+  assert.equal(c.render.disabled, true);
+  c.mode.value = 'alpha'; c.mode.fire('input');
+  assert.equal(c.render.disabled, false);
+  assert.equal(c.ink.disabled, true);
+  assert.equal(c.luminanceControls.hidden, true);
+  assert.match(c.modeInfo.textContent, /ohne Transparenz/);
+  await c.render.fire('click');
+  assert.equal(submitted().mode, 'alpha');
+  assert.equal(submitted().coverage, 100);
+  assert.equal(submitted().black_point, undefined);
+  c.mode.value = 'color'; c.mode.fire('input');
+  assert.equal(c.coverage.value, '65');
+  assert.equal(c.coverage.disabled, false);
+  assert.equal(c.download.hidden, true);
+});
+
+test('Verspätetes Ergebnis überschreibt keinen neuen Modus', async () => {
+  const ui = setup();
+  await ui.importImage();
+  let resolve;
+  ui.defer(new Promise(done => { resolve = done; }));
+  const rendering = ui.c.render.fire('click');
+  ui.c.mode.value = 'alpha'; ui.c.mode.fire('input');
+  resolve({ ok: true, blob: async () => new Blob(['old result']) });
+  await rendering;
+  assert.equal(ui.c.download.hidden, true);
+  assert.equal(ui.c.result.hidden, true);
 });

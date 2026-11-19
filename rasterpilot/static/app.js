@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const fields = ['width', 'ppi', 'x', 'y', 'cropWidth', 'cropHeight', 'spacing', 'coverage'];
+const fields = ['width', 'ppi', 'spacing', 'coverage', 'angle'];
 let image = null;
 let originalFile = null;
 let sourceWidth = 0;
@@ -35,18 +35,17 @@ function invalidate() {
 
 function parameters(checkOutput = true) {
   const values = fields.map(id => Number($(id).value));
-  const [width, ppi, x, y, w, h, spacing, coverage] = values;
+  const [width, ppi, spacing, coverage, angle] = values;
   const valid = image && fields.every(id => $(id).value !== '' && $(id).checkValidity()) &&
-    values.every(Number.isFinite) && [x, y, w, h, ppi].every(Number.isInteger) &&
-    x + w <= sourceWidth && y + h <= sourceHeight;
-  if (!valid) throw new Error('Bitte gültige Werte und einen Ausschnitt innerhalb des Bildes eingeben.');
+    values.every(Number.isFinite) && Number.isInteger(ppi);
+  if (!valid) throw new Error('Bitte gültige Werte für Druckgröße und Raster eingeben.');
   const pxWidth = Math.max(1, Math.round(width / 2.54 * ppi));
-  const pxHeight = Math.max(1, Math.round(pxWidth * h / w));
+  const pxHeight = Math.max(1, Math.round(pxWidth * sourceHeight / sourceWidth));
   if (checkOutput && (pxWidth * pxHeight > 40000000 || Math.max(pxWidth, pxHeight) > 12000)) {
     throw new Error('Die gewählte Druckgröße ergibt mehr als 40 Megapixel oder 12000 Pixel je Kante. Bitte Druckbreite oder Auflösung verringern; das Originalbild kann unverändert bleiben.');
   }
   if (spacing / 25.4 * ppi < 2) throw new Error('Der Rasterabstand muss bei dieser Auflösung mindestens zwei Pixel betragen.');
-  return { width_cm: width, ppi, x, y, crop_width: w, crop_height: h, spacing_mm: spacing, coverage };
+  return { width_cm: width, ppi, spacing_mm: spacing, coverage, angle_deg: angle };
 }
 
 function updateView() {
@@ -64,21 +63,18 @@ function renderOriginal() {
   try {
     const p = parameters(false);
     const pw = Math.max(1, Math.round(p.width_cm / 2.54 * p.ppi));
-    const ph = Math.max(1, Math.round(pw * p.crop_height / p.crop_width));
-    $('dimensions').textContent = `${(p.width_cm * p.crop_height / p.crop_width).toFixed(2)} cm hoch · ${pw} × ${ph} px`;
-    $('spacingInfo').textContent = `${(p.spacing_mm / 25.4 * p.ppi).toFixed(2)} Pixel Abstand der Punktmitten · Winkel 0°`;
-    const scale = Math.min(1, 1600 / Math.max(p.crop_width, p.crop_height));
+    const ph = Math.max(1, Math.round(pw * sourceHeight / sourceWidth));
+    $('dimensions').textContent = `${(p.width_cm * sourceHeight / sourceWidth).toFixed(2)} cm hoch · ${pw} × ${ph} px`;
+    $('spacingInfo').textContent = `${(p.spacing_mm / 25.4 * p.ppi).toFixed(2)} Pixel Abstand der Punktmitten · Winkel ${p.angle_deg}°`;
+    const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight));
     const canvas = $('canvas');
-    canvas.width = Math.max(1, Math.round(p.crop_width * scale));
-    canvas.height = Math.max(1, Math.round(p.crop_height * scale));
-    canvas.getContext('2d').drawImage(image,
-      p.x * image.width / sourceWidth, p.y * image.height / sourceHeight,
-      p.crop_width * image.width / sourceWidth, p.crop_height * image.height / sourceHeight,
-      0, 0, canvas.width, canvas.height);
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
     $('render').disabled = false;
     $('render').dataset.valid = '1';
     message('');
-    // Das Original bleibt auch bei zu großen Exportmaßen zum Zuschneiden sichtbar.
+    // Das vollständige Original bleibt auch bei zu großen Exportmaßen sichtbar.
     try { parameters(); } catch (error) { $('render').disabled = true; message(error.message); }
   } catch (error) {
     message(error.message);
@@ -87,14 +83,6 @@ function renderOriginal() {
     delete $('render').dataset.valid;
   }
   updateView();
-}
-
-function resetCrop() {
-  if (!image) return;
-  $('x').value = 0; $('y').value = 0;
-  $('cropWidth').value = sourceWidth; $('cropHeight').value = sourceHeight;
-  invalidate();
-  renderOriginal();
 }
 
 async function requestImage(path, data, signal) {
@@ -138,7 +126,7 @@ $('file').addEventListener('change', async event => {
     $('imageNotes').textContent = JSON.parse(response.headers.get('X-Image-Notes') || '[]').join(' ');
     $('settings').disabled = false;
     $('empty').hidden = true;
-    resetCrop();
+    renderOriginal();
   } catch (error) {
     if (current === sequence && error.name !== 'AbortError') message(error.message);
   } finally {
@@ -187,4 +175,3 @@ $('render').addEventListener('click', async () => {
 
 for (const id of fields) $(id).addEventListener('input', () => { invalidate(); renderOriginal(); });
 for (const id of ['color', 'background', 'view', 'zoom']) $(id).addEventListener('input', updateView);
-$('reset').addEventListener('click', resetCrop);

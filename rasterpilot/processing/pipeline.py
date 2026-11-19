@@ -80,12 +80,11 @@ def _number(values, key, low, high, integer=False):
 class Parameters:
     width_cm: float
     ppi: int
-    x: int
-    y: int
-    crop_width: int
-    crop_height: int
+    source_width: int
+    source_height: int
     spacing_mm: float
     coverage: float
+    angle_deg: float
 
     @classmethod
     def from_dict(cls, values, size):
@@ -95,15 +94,12 @@ class Parameters:
         result = cls(
             _number(values, 'width_cm', 0.1, 200),
             _number(values, 'ppi', 36, 1200, True),
-            _number(values, 'x', 0, w - 1, True),
-            _number(values, 'y', 0, h - 1, True),
-            _number(values, 'crop_width', 1, w, True),
-            _number(values, 'crop_height', 1, h, True),
+            w,
+            h,
             _number(values, 'spacing_mm', 0.1, 10),
             _number(values, 'coverage', 0, 100),
+            _number({'angle_deg': values.get('angle_deg', 0)}, 'angle_deg', -180, 180),
         )
-        if result.x + result.crop_width > w or result.y + result.crop_height > h:
-            raise ImageError('Der Ausschnitt muss vollständig innerhalb des Bildes liegen.')
         result.output_size()  # Grenzen vor Skalierung und Speicherreservierung prüfen.
         if result.spacing_px < 2:
             raise ImageError('Der Rasterabstand muss bei dieser Auflösung mindestens zwei Pixel betragen. Bitte Abstand oder Auflösung erhöhen.')
@@ -116,7 +112,7 @@ class Parameters:
     def output_size(self):
         # Positive Werte werden wie Math.round im Browser auf halbe Pixel aufgerundet.
         w = max(1, math.floor(self.width_cm / 2.54 * self.ppi + 0.5))
-        h = max(1, math.floor(w * self.crop_height / self.crop_width + 0.5))
+        h = max(1, math.floor(w * self.source_height / self.source_width + 0.5))
         if w * h > MAX_OUTPUT_PIXELS or max(w, h) > MAX_OUTPUT_SIDE:
             raise ImageError('Die gewählte Druckgröße ergibt mehr als 40 Megapixel oder 12000 Pixel je Kante. Bitte Druckbreite oder Auflösung verringern; das Originalbild kann unverändert bleiben.')
         return w, h
@@ -155,16 +151,19 @@ def _area_rank(distance_squared):
 
 def render_png(image, parameters):
     size = parameters.output_size()
-    x, y = parameters.x, parameters.y
-    with image.crop((x, y, x + parameters.crop_width, y + parameters.crop_height)) as crop:
-        result = _resize_rgba(crop, size)
+    result = _resize_rgba(image, size)
     pitch = parameters.spacing_px
-    # Pixelmitten verwenden; Rasterursprung ist die linke obere Ausschnittkante.
-    xx = ((np.arange(size[0], dtype=np.float64) + 0.5) / pitch) % 1 - 0.5
+    angle = math.radians(parameters.angle_deg)
+    cosine, sine = math.cos(angle), math.sin(angle)
+    # Pixelmitten in Rasterkoordinaten abbilden. Positive Winkel drehen das
+    # Raster im Uhrzeigersinn um die linke obere Bildkante, ohne das Bild zu drehen.
+    xx = (np.arange(size[0], dtype=np.float64) + 0.5) / pitch
     for start in range(0, size[1], 128):
         end = min(start + 128, size[1])
-        yy = ((np.arange(start, end, dtype=np.float64) + 0.5) / pitch) % 1 - 0.5
-        rank = _area_rank(yy[:, None] ** 2 + xx[None, :] ** 2)
+        yy = (np.arange(start, end, dtype=np.float64) + 0.5) / pitch
+        u = (cosine * xx[None, :] + sine * yy[:, None]) % 1 - 0.5
+        v = (-sine * xx[None, :] + cosine * yy[:, None]) % 1 - 0.5
+        rank = _area_rank(u ** 2 + v ** 2)
         with result.crop((0, start, size[0], end)) as band:
             pixels = np.array(band)
         # Alpha genau einmal in die gewünschte Deckung einbeziehen.

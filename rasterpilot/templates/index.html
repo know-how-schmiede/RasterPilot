@@ -18,13 +18,12 @@
     <fieldset id="settings" disabled><legend>Druckgröße</legend>
       <label>Druckbreite in cm <input id="width" type="number" min="0.1" max="200" step="0.1" value="28"></label>
       <label>Auflösung in ppi <input id="ppi" type="number" min="36" max="1200" step="1" value="300"></label>
-      <p class="hint">Bildauflösung, keine Druckerauflösung. Export: maximal 40 Megapixel und 12000 Pixel je Kante.</p>
+      <p class="hint">Das vollständige Bild wird mit unverändertem Seitenverhältnis verarbeitet. Bildauflösung, keine Druckerauflösung. Export: maximal 40 Megapixel und 12000 Pixel je Kante.</p>
       <p id="dimensions" class="dimensions"></p>
-      <h2>Ausschnitt</h2><p class="hint">Werte in Pixeln des orientierten Originalbilds.</p>
-      <div class="grid"><label>Links <input id="x" type="number" min="0" step="1" value="0"></label><label>Oben <input id="y" type="number" min="0" step="1" value="0"></label><label>Breite <input id="cropWidth" type="number" min="1" step="1"></label><label>Höhe <input id="cropHeight" type="number" min="1" step="1"></label></div>
-      <button type="button" id="reset">Ausschnitt zurücksetzen</button>
       <h2>Raster · Farbig auflockern</h2>
       <label>Rasterabstand in mm <input id="spacing" type="number" min="0.1" max="10" step="0.1" value="1"></label>
+      <label>Rasterwinkel in ° <input id="angle" type="number" min="-180" max="180" step="1" value="0"></label>
+      <p class="hint">Positive Winkel drehen das Raster im Uhrzeigersinn. Das Motiv bleibt unverändert ausgerichtet.</p>
       <p id="spacingInfo" class="hint"></p>
       <label>Deckung in % <input id="coverage" type="number" min="0" max="100" step="1" value="65"></label>
       <p class="hint">Weniger Deckung bedeutet mehr transparente Lücken. Weiß bleibt Motivfarbe; vorhandene Transparenz wird berücksichtigt.</p>
@@ -32,11 +31,11 @@
       <a id="download" class="download" hidden>PNG herunterladen</a>
       <p class="hint">PNG mit binärem Alpha, sRGB-Profil und Auflösungsmetadaten. Textilfarbe und Transparenzraster werden nicht exportiert.</p>
       <h2>Ansicht</h2>
-      <label>Vergleich <select id="view"><option value="original">Originalausschnitt</option><option id="resultOption" value="result" disabled>Rasterergebnis</option></select></label>
+      <label>Vergleich <select id="view"><option value="original">Originalbild</option><option id="resultOption" value="result" disabled>Rasterergebnis</option></select></label>
       <label>Zoom <select id="zoom" disabled><option value="fit">Einpassen</option><option value="actual">100 % · Exportpixel prüfen</option></select></label>
       <label>Hintergrund <select id="background"><option value="textile">Textilfarbe</option><option value="checker">Transparenzraster</option></select></label>
       <label>Textilfarbe <input id="color" type="color" value="#233246"></label>
     </fieldset>
-  </section><section class="preview" aria-label="Bildvorschau"><div class="preview-head"><h2>Vorschau</h2><span id="renderState">Noch kein aktuelles Raster</span></div><div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes farbiges Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du den Ausschnitt durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p></section></div>
+  </section><section class="preview" aria-label="Bildvorschau"><div class="preview-head"><h2>Vorschau</h2><span id="renderState">Noch kein aktuelles Raster</span></div><div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes farbiges Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du das Bild durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p></section></div>
 </main><footer class="wrap">RasterPilot · Druckmaße im RIP prüfen und vor der Produktion einen Testdruck durchführen.</footer>
 </body></html>

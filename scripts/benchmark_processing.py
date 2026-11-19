@@ -65,8 +65,8 @@ def main():
     start = perf_counter()
     image, _ = load_image(source)
     with image:
-        parameters = Parameters.from_dict(dict(width_cm=args.width_cm, ppi=300, x=0, y=0,
-            crop_width=args.source_side, crop_height=args.source_side, spacing_mm=1, coverage=65), image.size)
+        parameters = Parameters.from_dict(dict(width_cm=args.width_cm, ppi=300,
+            spacing_mm=1, coverage=65, angle_deg=0), image.size)
         with render_png(image, parameters) as result:
             output_bytes = result.getbuffer().nbytes
     print(json.dumps(dict(system=platform.platform(), python=platform.python_version(),

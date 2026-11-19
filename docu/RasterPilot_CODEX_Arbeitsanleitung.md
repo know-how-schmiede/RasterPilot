@@ -1,6 +1,6 @@
 # RasterPilot – Arbeitsanweisung für Codex
 
-Stand: 18. November 2026
+Stand: 19. November 2026
 
 ## 1. Auftrag und Ziel
 
@@ -84,7 +84,7 @@ Diese Arbeitsanweisung unter `docu/RasterPilot_CODEX_Arbeitsanleitung.md` führe
 ## 4. Umfang der ersten nutzbaren Version
 
 - PNG und JPEG importieren; vorhandene PNG-Transparenz erhalten.
-- Motiv zuschneiden; Seitenverhältnis bei Größenänderung erhalten.
+- Immer das vollständige Motiv verarbeiten und ausgeben; Zuschnitt auf Anwenderwunsch vorerst entfernt. Seitenverhältnis bei Größenänderung erhalten.
 - Druckbreite in Zentimetern und Ausgabeauflösung festlegen, berechnete Höhe und Pixelmaße anzeigen.
 - Farbiges Motiv gleichmäßig durch transparente Rasterlücken auflockern.
 - Klassisches einfarbiges, helligkeitsgesteuertes Halbtonmotiv erzeugen; Druckfarbe und Umkehrung anbieten.
@@ -102,7 +102,7 @@ Später: automatische Freistellung, manuell geschützte Bereiche, weitere Punktf
 
 Datei wirklich dekodieren und Inhalt prüfen, EXIF-Orientierung anwenden, danach unnötige Metadaten entfernen. Eingebettete Farbprofile kontrolliert nach sRGB umwandeln. Bei fehlendem Profil eine dokumentierte sRGB-Annahme verwenden; problematische Profile verständlich melden. Intern Farbe und Alpha getrennt behandeln. Transparente Pixel dürfen Histogramme und Farbmittelwerte nicht verfälschen.
 
-Zuschneiden vor der endgültigen Skalierung ausführen. Original unverändert behalten; jede Berechnung vom Original und dem aktuellen Parametersatz starten.
+Das vollständige Bild ohne Zuschnitt skalieren und verarbeiten. Original unverändert behalten; jede Berechnung vom Original und dem aktuellen Parametersatz starten. Ausgabegrenzen anhand des vollständigen Seitenverhältnisses prüfen.
 
 ### 5.2 Zielgröße berechnen
 
@@ -132,7 +132,7 @@ Alpha nicht versehentlich zweimal multiplizieren. Für jeden Modus die genaue Fo
 
 ### 5.5 Halbtonraster erzeugen
 
-Mit regelmäßigem Raster und runden Punkten beginnen; Winkel optional mit dokumentiertem Standard. Rasterabstand bezeichnet den Abstand der Punktmittelpunkte und ist vom Punktdurchmesser zu unterscheiden.
+Mit regelmäßigem Raster und runden Punkten beginnen; Rasterwinkel von −180° bis +180° mit Standard 0° anbieten. Positive Winkel drehen nur das Raster im Uhrzeigersinn um die linke obere Bildkante; das Motiv bleibt vollständig und unverändert ausgerichtet. Rasterabstand bezeichnet den Abstand der Punktmittelpunkte und ist vom Punktdurchmesser zu unterscheiden.
 
 Die Punktfläche muss die gewünschte Flächendeckung abbilden. Den Radius nicht linear aus dem Tonwert ableiten: Für isolierte Kreisflächen gilt Fläche proportional Radius zum Quadrat. Die Behandlung hoher Deckungen ausdrücklich lösen, beispielsweise durch Übergang zu transparenten Löchern. Überlappende Kreise liefern sonst keine einfache lineare Deckung mehr.
 
@@ -197,7 +197,7 @@ Zusätzlich manuell mit Foto, Logo, weißer Schrift, transparentem PNG und weich
 ## 10. Umsetzungsetappen
 
 1. **Grundgerüst:** Architektur, README, Roadmap und Versionsdatei; startfähige Oberfläche und Health-Endpunkt.
-2. **Import und Vorschau:** PNG/JPEG, Orientierung, Transparenz, Zuschnitt, Druckgröße und Textilfarbvorschau.
+2. **Import und Vorschau:** PNG/JPEG, Orientierung, Transparenz, vollständiges Motiv, Druckgröße und Textilfarbvorschau.
 3. **Erster vollständiger Ablauf:** Farbiges Auflockern mit runden Punkten, finaler Größenberechnung und PNG-Export. Mit Tests absichern.
 4. **Weitere Modi:** Einfarbiges Helligkeitsraster und Transparenzraster; Tonwerte und erweitertes Einstellungsmenü.
 5. **Betriebsfähigkeit:** Job-Worker, Limits, Zugriffstrennung, automatische Bereinigung und Einstellungen als JSON.

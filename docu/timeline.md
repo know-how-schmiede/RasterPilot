@@ -1,5 +1,13 @@
 # Timeline
 
+## 0.2.3 – 19. November 2026
+
+- Anwender bestätigt den bisherigen Ablauf als funktionierend und wünscht vorerst vollständige Bilder ohne Ausschnittbereich.
+- Ausschnittfelder, Zurücksetzen und Zuschnitt im Verarbeitungskern entfernt. Vorschau und PNG-Export verwenden immer das vollständige orientierte Motiv mit erhaltenem Seitenverhältnis; Druckgrößen-, Auflösungs- und Uploadgrenzen bleiben bestehen. Alte Ausschnittparameter können keine Bildteile mehr entfernen.
+- Rasterwinkel von −180° bis +180° ergänzt, Vorgabe 0°. Positive Winkel drehen das Punktraster im Uhrzeigersinn; das Motiv behält Ausrichtung und vollständige Abmessungen. Winkeländerungen sperren veraltete Ergebnisse und Downloads.
+- 29 Python-Tests und acht JavaScript-Zustandstests erfolgreich. Ein vorhandenes Original zusätzlich bei 45° über die API geprüft: 3307 × 4419 Pixel, binäres Alpha und 300 ppi. Synthetische Gegenüberstellung von 0° und 45° visuell geprüft. Die Browserprüfung konnte wegen einer Zeitüberschreitung der App-Zugriffsfreigabe nicht starten; manuelle Browser- und Druckabnahme offen.
+- Bedienung, README, Arbeitsanweisung, Architektur und Roadmap angepasst. Keine geänderten Installationsvoraussetzungen oder Installations-/Updateskripte.
+
 ## 0.2.2 – 18. November 2026
 
 - Anwender bestätigt erfolgreiche Neuinstallation im Debian-LXC sowie Bild-Upload und Rasterung.

@@ -9,8 +9,7 @@ from rasterpilot.processing import ImageError, Parameters, load_image, prepare_p
 
 
 def options(**changes):
-    values = dict(width_cm=2.54, ppi=256, x=0, y=0, crop_width=256,
-                  crop_height=256, spacing_mm=3.175, coverage=65)
+    values = dict(width_cm=2.54, ppi=256, spacing_mm=3.175, coverage=65, angle_deg=0)
     values.update(changes)
     return values
 
@@ -28,9 +27,9 @@ class ProcessingTest(unittest.TestCase):
         with render_png(image, p) as data, Image.open(data) as result:
             return np.array(result), result.info.copy(), result.size
 
-    def test_dimensions_crop_and_ppi_metadata(self):
-        image = Image.new('RGBA', (256, 256), 'white')
-        array, info, size = self.result(image, width_cm=5.08, ppi=100, crop_height=128)
+    def test_full_image_dimensions_and_ppi_metadata(self):
+        image = Image.new('RGBA', (256, 128), 'white')
+        array, info, size = self.result(image, width_cm=5.08, ppi=100)
         self.assertEqual(size, (200, 100))
         self.assertAlmostEqual(info['dpi'][0], 100, delta=0.02)
         self.assertEqual(ImageCms.ImageCmsProfile(BytesIO(info['icc_profile'])).profile.xcolor_space.strip(), 'RGB')
@@ -47,14 +46,15 @@ class ProcessingTest(unittest.TestCase):
 
     def test_coverage_is_monotonic_and_matches_area_including_high_coverage(self):
         image = Image.new('RGBA', (256, 256), 'white')
-        previous = np.zeros((256, 256), dtype=bool)
-        for coverage in (5, 25, 50, 65, 78, 85, 95, 100):
-            with self.subTest(coverage=coverage):
-                array, _, _ = self.result(image, coverage=coverage)
-                visible = array[:, :, 3] == 255
-                self.assertTrue(np.all(visible | ~previous))
-                self.assertAlmostEqual(visible.mean(), coverage / 100, delta=0.012)
-                previous = visible
+        for angle in (-30, 0, 27, 45):
+            previous = np.zeros((256, 256), dtype=bool)
+            for coverage in (5, 25, 50, 65, 78, 85, 95, 100):
+                with self.subTest(angle=angle, coverage=coverage):
+                    array, _, _ = self.result(image, coverage=coverage, angle_deg=angle)
+                    visible = array[:, :, 3] == 255
+                    self.assertTrue(np.all(visible | ~previous))
+                    self.assertAlmostEqual(visible.mean(), coverage / 100, delta=0.012)
+                    previous = visible
 
     def test_transparency_is_respected_and_applied_once(self):
         image = Image.new('RGBA', (256, 256), (12, 134, 231, 128))
@@ -66,12 +66,65 @@ class ProcessingTest(unittest.TestCase):
         self.assertAlmostEqual(visible.mean(), 0.5 * 128 / 255, delta=0.012)
         self.assertTrue(np.all(np.abs(right[visible, :3].astype(int) - [12, 134, 231]) <= 2))
 
-    def test_crop_is_taken_before_scaling(self):
+    def test_full_image_and_borders_survive_even_with_legacy_crop_parameters(self):
+        image = Image.new('RGBA', (256, 128), 'red')
+        image.paste('blue', (128, 0, 256, 128))
+        # Alte Clients dürfen auch mit Ausschnittwerten keine Bildteile entfernen.
+        array, _, size = self.result(image, x=128, y=10, crop_width=128, crop_height=64,
+                                     coverage=100, angle_deg=45)
+        self.assertEqual(size, image.size)
+        np.testing.assert_array_equal(array, np.array(image))
+
+    def test_angle_rotates_only_the_grid_clockwise_across_band_boundaries(self):
         image = Image.new('RGBA', (256, 256), 'red')
         image.paste('blue', (128, 0, 256, 256))
-        array, _, size = self.result(image, x=128, crop_width=128, coverage=100)
-        self.assertEqual(size, (256, 512))
-        self.assertTrue(np.all(array[:, :, :3] == [0, 0, 255]))
+        base, _, _ = self.result(image, coverage=25)
+        for angle in (-30, 30, 45):
+            with self.subTest(angle=angle):
+                array, _, size = self.result(image, coverage=25, angle_deg=angle)
+                self.assertEqual(size, image.size)
+                self.assertFalse(np.array_equal(base[:, :, 3], array[:, :, 3]))
+                # Unabhängige Geometrie: Distanz zu gedrehten Punktmittelpunkten.
+                # 25 % Deckung erzeugt isolierte Kreise (kein Zellüberlauf).
+                yy, xx = np.indices((256, 256), dtype=float)
+                distance = np.full((256, 256), np.inf)
+                radians = np.deg2rad(angle)
+                for row in range(-12, 13):
+                    for col in range(-12, 13):
+                        x, y = (col + 0.5) * 32, (row + 0.5) * 32
+                        cx = x * np.cos(radians) - y * np.sin(radians)
+                        cy = x * np.sin(radians) + y * np.cos(radians)
+                        distance = np.minimum(distance, (xx + 0.5 - cx) ** 2 + (yy + 0.5 - cy) ** 2)
+                expected = distance < 0.25 / np.pi * 32 ** 2
+                np.testing.assert_array_equal(array[:, :, 3] == 255, expected)
+                visible = array[:, :, 3] == 255
+                np.testing.assert_array_equal(array[visible, :3], np.array(image)[visible, :3])
+
+    def test_rotated_coverage_and_alpha(self):
+        image = Image.new('RGBA', (256, 256), (12, 134, 231, 128))
+        image.paste((0, 0, 0, 0), (0, 0, 128, 256))
+        for angle in (-180, -45, 0, 45, 90, 180):
+            previous = np.zeros((256, 256), dtype=bool)
+            for coverage in (0, 25, 65, 85, 100):
+                with self.subTest(angle=angle, coverage=coverage):
+                    array, _, _ = self.result(image, coverage=coverage, angle_deg=angle)
+                    visible = array[:, :, 3] == 255
+                    self.assertTrue(np.all(visible | ~previous))
+                    self.assertTrue(np.all(~visible[:, :128]))
+                    self.assertAlmostEqual(visible[:, 128:].mean(), coverage / 100 * 128 / 255, delta=0.025)
+                    self.assertLessEqual(set(np.unique(array[:, :, 3])), {0, 255})
+                    previous = visible
+
+    def test_omitted_angle_defaults_to_unchanged_zero_degree_grid(self):
+        values = options()
+        del values['angle_deg']
+        p = Parameters.from_dict(values, (256, 256))
+        self.assertEqual(p.angle_deg, 0)
+        image = Image.new('RGBA', (256, 256), 'white')
+        array, _, _ = self.result(image)
+        yy, xx = np.indices((256, 256), dtype=float)
+        q = (((xx + 0.5) / 32) % 1 - 0.5) ** 2 + (((yy + 0.5) / 32) % 1 - 0.5) ** 2
+        np.testing.assert_array_equal(array[:, :, 3] == 255, np.pi * q < 0.65)
 
     def test_scaling_does_not_mix_in_invisible_colors(self):
         image = Image.new('RGBA', (256, 256), (0, 0, 255, 0))
@@ -83,20 +136,20 @@ class ProcessingTest(unittest.TestCase):
     def test_invalid_parameters_and_limits(self):
         for changes in (dict(width_cm=float('nan')), dict(coverage=float('inf')),
                         dict(ppi=True), dict(ppi=100.5), dict(width_cm='28'),
-                        dict(x=200, crop_width=100), dict(y=-1), dict(crop_width=0),
+                        dict(angle_deg=-181), dict(angle_deg=181), dict(angle_deg=True),
+                        dict(angle_deg='45'), dict(angle_deg=None), dict(angle_deg=float('nan')),
                         dict(width_cm=200, ppi=1200), dict(spacing_mm=0.1, ppi=36),
                         dict(coverage=101), dict(width_cm=10 ** 1000)):
             with self.subTest(changes=changes), self.assertRaises(ImageError):
                 Parameters.from_dict(options(**changes), (256, 256))
 
     def test_half_pixel_rounding_matches_browser(self):
-        p = Parameters.from_dict(options(width_cm=2.54, ppi=101, crop_width=2, crop_height=1), (2, 1))
+        p = Parameters.from_dict(options(width_cm=2.54, ppi=101), (2, 1))
         self.assertEqual(p.output_size(), (101, 51))
 
     def test_midjourney_portrait_at_default_print_settings(self):
         image = Image.new('RGBA', (1904, 2544), 'white')
-        p = Parameters.from_dict(options(width_cm=28, ppi=300, crop_width=1904,
-            crop_height=2544, spacing_mm=1), image.size)
+        p = Parameters.from_dict(options(width_cm=28, ppi=300, spacing_mm=1), image.size)
         self.assertEqual(p.output_size(), (3307, 4419))
         with render_png(image, p) as data, Image.open(data) as result:
             self.assertEqual(result.size, (3307, 4419))
@@ -105,13 +158,13 @@ class ProcessingTest(unittest.TestCase):
 
     def test_output_pixel_and_side_limits_still_apply(self):
         # 6000² ist zulässig, 6500² überschreitet 40 MP; sehr schmale
-        # Ausschnitte dürfen trotz kleiner Fläche nicht die Kantengrenze umgehen.
+        # Bilder dürfen trotz kleiner Fläche nicht die Kantengrenze umgehen.
         p = Parameters.from_dict(options(width_cm=50.8, ppi=300), (256, 256))
         self.assertEqual(p.output_size(), (6000, 6000))
-        for changes in (dict(width_cm=55.0333333333, ppi=300),
-                        dict(width_cm=110, ppi=300, crop_height=1)):
+        for changes, size in ((dict(width_cm=55.0333333333, ppi=300), (256, 256)),
+                              (dict(width_cm=110, ppi=300), (256, 1))):
             with self.subTest(changes=changes), self.assertRaises(ImageError):
-                Parameters.from_dict(options(**changes), (256, 256))
+                Parameters.from_dict(options(**changes), size)
 
     def test_decode_exif_orientation_and_remove_metadata(self):
         image = Image.new('RGB', (30, 20), 'red')

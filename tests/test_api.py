@@ -32,13 +32,13 @@ class ImageApiTest(unittest.TestCase):
         response.close()
 
     def test_render_is_an_attachment_with_expected_png_and_metadata(self):
-        response = self.client.post('/api/render', data=self.data(crop_height=128), headers=self.headers)
+        response = self.client.post('/api/render', data=self.data(angle_deg=45), headers=self.headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, 'image/png')
         self.assertIn('motiv_rasterpilot_25.4mm_256ppi.png', response.headers['Content-Disposition'])
         self.assertEqual(response.headers['Cache-Control'], 'no-store')
         with Image.open(BytesIO(response.data)) as image:
-            self.assertEqual(image.size, (256, 128))
+            self.assertEqual(image.size, (256, 256))
             self.assertAlmostEqual(image.info['dpi'][0], 256, delta=0.02)
         response.close()
 
@@ -48,6 +48,20 @@ class ImageApiTest(unittest.TestCase):
             response = self.client.post('/api/render', data=self.data(), headers=headers)
             self.assertEqual(response.status_code, 403)
             self.assertNotIn('Access-Control-Allow-Origin', response.headers)
+
+    def test_render_keeps_full_nonsquare_image_despite_legacy_crop_values(self):
+        with Image.new('RGBA', (256, 128), 'red') as source:
+            source.paste('blue', (128, 0, 256, 128))
+            data = dict(image=(encoded(source, format='PNG'), 'motiv.png'),
+                        parameters=json.dumps(options(coverage=100, angle_deg=-30,
+                            x=128, y=0, crop_width=128, crop_height=128)))
+            response = self.client.post('/api/render', data=data, headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['X-Image-Width'], '256')
+            self.assertEqual(response.headers['X-Image-Height'], '128')
+            with Image.open(BytesIO(response.data)) as result:
+                np.testing.assert_array_equal(np.array(result), np.array(source))
+            response.close()
 
     def test_same_origin_request_works(self):
         response = self.client.post('/api/render', data=self.data(),
@@ -59,7 +73,7 @@ class ImageApiTest(unittest.TestCase):
         for data in ({}, {'parameters': '{}'},
                      {'parameters': '[]', 'image': (BytesIO(b'bad'), 'fake.png')},
                      {**self.data(), 'parameters': 'broken JSON'},
-                     self.data(coverage=150)):
+                     self.data(coverage=150), self.data(angle_deg=181)):
             with self.subTest():
                 response = self.client.post('/api/render', data=data, headers=self.headers)
                 self.assertEqual(response.status_code, 400)

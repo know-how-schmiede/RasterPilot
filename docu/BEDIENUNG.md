@@ -4,7 +4,7 @@ Die Einstellungen sind experimentell und noch nicht anhand eines Druckprofils ka
 
 ## 1. Bild auswählen
 
-Unter „Bild auswählen“ eine PNG- oder JPEG-Datei öffnen, höchstens 20 MiB und 40 Megapixel. Das Original wird an diesen RasterPilot-Server übertragen. Dort erfolgen Dekodierung, Orientierung und Farbkonvertierung im Arbeitsspeicher; es werden keine Bilddateien oder Projekte gespeichert. Beim Neuladen der Seite muss das Bild erneut gewählt werden.
+Unter „Bild auswählen“ eine PNG- oder JPEG-Datei öffnen, höchstens 20 MiB und 40 Megapixel. Das Original wird an diesen RasterPilot-Server übertragen. Vorschau, Orientierung und Farbkonvertierung erfolgen im Arbeitsspeicher. Für die Hintergrundberechnung werden Original und Ergebnis vorübergehend im privaten Datenverzeichnis gespeichert. Der laufende Worker entfernt abgelaufene Aufträge nach einer Stunde; es gibt keine dauerhafte Projektablage. Beim Neuladen der Seite muss das Bild erneut gewählt werden. Ein Sitzungscookie ordnet Aufträge diesem Browserzugang zu; andere Browserzugänge können sie nicht abrufen.
 
 Eine EXIF-Drehung wird vor der Anzeige und Verarbeitung angewendet. Eingebettete Farbprofile werden nach sRGB umgerechnet; ohne Profil erscheint ein Hinweis auf die sRGB-Annahme. Ungültige Profile, CMYK-Bilder ohne Profil und animierte PNG-Dateien werden mit einer Erklärung abgewiesen. Speichere solche Bilder zuvor als einzelnes sRGB-PNG oder -JPEG.
 
@@ -44,6 +44,10 @@ Die Tonwerte verändern ausschließlich die Helligkeitsmaske im einfarbigen Modu
 
 Die Kreispunktfläche wird aus der Deckung bestimmt. Bei hohen Deckungen berühren sich die Punkte und die Lücken werden kleiner. Pixelrundung, kleine Rasterabstände und angeschnittene Motivkanten können von der theoretischen Deckung abweichen. Mindestpunkte und Mindestlücken werden noch nicht anhand eines Druckprofils geprüft.
 
+Die Berechnung läuft im Hintergrund. Die Meldung zeigt „Warteschlange“ oder „wird berechnet“; ein genauer Prozentfortschritt wird nicht geschätzt. Ein Auftrag wird jeweils verarbeitet, höchstens vier dürfen gleichzeitig aktiv oder wartend sein. Pro Browserzugang ist ein aktiver Auftrag erlaubt. Mehrere Tabs desselben Browserprofils teilen diese Zuordnung. Bei voller Warteschlange später erneut versuchen.
+
+„Berechnung abbrechen“ beendet den eigenen Auftrag. Neue Einstellungen oder ein anderes Bild brechen eine vorherige Berechnung ebenfalls ab. Verspätete Ergebnisse ersetzen keine neueren Einstellungen. Ein Auftrag darf standardmäßig höchstens 180 Sekunden rechnen; danach Druckgröße oder Auflösung reduzieren und erneut versuchen. Ohne erreichbaren Worker ist keine neue Berechnung möglich. Während eines Updates oder Dienstneustarts unterbrochene Aufträge bitte erneut starten.
+
 ## 4. Prüfen und herunterladen
 
 Die Einstellungen unter „Ansicht“ befinden sich direkt über der Bildvorschau. Unter „Vergleich“ zwischen Originalbild und Rasterergebnis wechseln. Das Original ist eine auf 1600 Pixel Kantenlänge begrenzte Vorschau; das Rasterergebnis stammt direkt aus der vollständigen Exportdatei.
@@ -58,6 +62,12 @@ Die Datei enthält sRGB-Profil, Pixelmaße und Auflösungsmetadaten, aber weder 
 
 Das Dateinamensschema bleibt in allen Modi gleich. Modus, Druckfarbe und Tonwerte sind nicht im Namen enthalten; Varianten bei Bedarf beim Speichern unterscheiden.
 
+## 5. Einstellungen speichern und laden
+
+Über „Einstellungen speichern und laden“ oberhalb der Bildauswahl eine JSON-Datei speichern oder öffnen. Die Datei enthält Druckmaße, Auflösung, Rastermodus, Abstand, Winkel, Deckung, Druckfarbe, Umkehrung, Tonwerte sowie Hintergrund, Textilfarbe und Zoom. Sie enthält weder Bilddaten noch Server-Aufträge oder Dateipfade und kann auch ohne gewähltes Bild verwendet werden.
+
+Beim Laden wird die ganze Datei geprüft, bevor Werte übernommen werden. Beschädigte Dateien, unbekannte Versionen, unzulässige Werte und Dateien über 64 KiB werden abgewiesen; die bisherigen Einstellungen und ein vorhandenes Ergebnis bleiben dabei erhalten. Nach erfolgreichem Laden das Raster neu berechnen. Ein Originalbild muss bei Bedarf erneut ausgewählt werden. Die Ansicht startet nach dem Laden beim Original; ein gespeicherter Zoom wird für das nächste Ergebnis übernommen.
+
 ## Bei Fehlern
 
-Die Meldung im Bedienfeld erklärt Bild- und Parameterfehler. HTTP 413 beim Import kann bei älteren Installationen auf das Nginx-Uploadlimit hinweisen; siehe [Installation und Update](INSTALLATION_Debian13.md#bestehende-installation-auf-020-umstellen). Bei Serverfehlern das Dienstprotokoll prüfen. Eine abgebrochene Browseranfrage kann serverseitig noch bis zum Abschluss ihrer begrenzten Berechnung laufen. Eine Warteschlange, gespeicherte Einstellungen und Hintergrundberechnung folgen später.
+Die Meldung im Bedienfeld erklärt Bild- und Parameterfehler. HTTP 413 beim Import kann bei älteren Installationen auf das Nginx-Uploadlimit hinweisen; siehe [Installation und Update](INSTALLATION_Debian13.md#bestehende-installation-auf-020-umstellen). Bei „Hintergrunddienst nicht bereit“ den Workerstatus prüfen. HTTP 429 bedeutet, dass Kapazität, temporärer Speicher oder der eigene aktive Auftrag eine weitere Annahme verhindern. Bei abgelaufenen Ergebnissen erneut berechnen. Wenn der Worker ausgeschaltet ist, erfolgt auch die Bereinigung erst nach seinem nächsten Start.

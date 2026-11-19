@@ -4,15 +4,23 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
+async function waitForSubmission(ui) {
+  for (let count = 0; count < 50 && !ui.calls.some(([path]) => path === '/api/jobs'); count++) {
+    await new Promise(setImmediate);
+  }
+  assert.ok(ui.calls.some(([path]) => path === '/api/jobs'));
+}
+
 function setup({ sourceWidth = 256, sourceHeight = 256,
-  downloadName = 'motiv_rp_280_300ppi_0G.png' } = {}) {
+  downloadName = 'motiv_rp_280_300ppi_0G.png', states = ['done'], queueError = null } = {}) {
   const controls = {};
   const defaults = { width: '28', ppi: '300', angle: '0', mode: 'color', ink: '#000000',
     black: '0', white: '255', gamma: '1',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
     'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
-    'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones'];
+    'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones', 'cancel',
+    'saveSettings', 'loadSettings', 'presetDownload'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
@@ -20,6 +28,7 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
       disabled: ['settings', 'viewSettings', 'zoom'].includes(name), checked: false, textContent: '', files: [], attrs: {},
       addEventListener(event, callback) { listeners[event] = callback; },
       fire(event) { return listeners[event]({ target: this }); },
+      click() { this.clicked = true; },
       setAttribute(key, value) { this.attrs[key] = value; },
       removeAttribute(key) { delete this[key]; },
       checkValidity() { return name !== 'angle' || (Number(this.value) >= -180 && Number(this.value) <= 180); },
@@ -29,14 +38,22 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   }
   let pending;
   let submitted;
+  const calls = [];
   const ctx = vm.createContext({
     document: { getElementById: id => controls[id] },
     URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
-    AbortController, FormData,
+    AbortController, FormData, Blob, setTimeout: (fn, delay) => setTimeout(fn, Math.min(delay, 10)), clearTimeout,
     createImageBitmap: async () => ({ width: 256, height: 256, close() {} }),
     fetch: async (path, request) => {
-      if (path.endsWith('render')) submitted = JSON.parse(request.body.get('parameters'));
-      if (pending && path.endsWith('render')) return pending;
+      calls.push([path, request.method]);
+      if (path === '/api/jobs') {
+        submitted = JSON.parse(request.body.get('parameters'));
+        if (queueError) return { ok: false, status: 503, json: async () => ({ error: queueError }) };
+        if (pending) return pending;
+        return { ok: true, json: async () => ({ id: 'job1', state: 'queued' }) };
+      }
+      if (path === '/api/jobs/job1') return { ok: true, json: async () => ({ state:
+        request.method === 'DELETE' ? 'cancelled' : states.length > 1 ? states.shift() : states[0] }) };
       return {
         ok: true, blob: async () => new Blob(['png']),
         headers: new Map([['X-Image-Width', String(sourceWidth)], ['X-Image-Height', String(sourceHeight)],
@@ -44,12 +61,13 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
       };
     }
   });
+  vm.runInContext(readFileSync('rasterpilot/static/settings.js', 'utf8'), ctx);
   vm.runInContext(readFileSync('rasterpilot/static/app.js', 'utf8'), ctx);
   async function importImage() {
     controls.file.files = [new Blob(['original'], { type: 'image/png' })];
     await controls.file.fire('change');
   }
-  return { c: controls, importImage, submitted: () => submitted, defer: promise => { pending = promise; } };
+  return { c: controls, importImage, calls, ctx, submitted: () => submitted, defer: promise => { pending = promise; } };
 }
 
 test('Import, Berechnung, Download und reine Ansichtsänderungen', async () => {
@@ -90,8 +108,9 @@ test('Verspätetes Ergebnis überschreibt keine neuen Einstellungen', async () =
   let resolve;
   ui.defer(new Promise(done => { resolve = done; }));
   const rendering = ui.c.render.fire('click');
+  await waitForSubmission(ui);
   ui.c.coverage.value = '30'; ui.c.coverage.fire('input');
-  resolve({ ok: true, blob: async () => new Blob(['old result']) });
+  resolve({ ok: true, json: async () => ({ id: 'job1', state: 'queued' }) });
   await rendering;
   assert.equal(ui.c.download.hidden, true);
   assert.equal(ui.c.result.hidden, true);
@@ -159,8 +178,9 @@ test('Verspätetes Ergebnis überschreibt keinen neuen Rasterwinkel', async () =
   let resolve;
   ui.defer(new Promise(done => { resolve = done; }));
   const rendering = ui.c.render.fire('click');
+  await waitForSubmission(ui);
   ui.c.angle.value = '-30'; ui.c.angle.fire('input');
-  resolve({ ok: true, blob: async () => new Blob(['old result']) });
+  resolve({ ok: true, json: async () => ({ id: 'job1', state: 'queued' }) });
   await rendering;
   assert.equal(ui.c.download.hidden, true);
   assert.equal(ui.c.result.hidden, true);
@@ -242,9 +262,84 @@ test('Verspätetes Ergebnis überschreibt keinen neuen Modus', async () => {
   let resolve;
   ui.defer(new Promise(done => { resolve = done; }));
   const rendering = ui.c.render.fire('click');
+  await waitForSubmission(ui);
   ui.c.mode.value = 'alpha'; ui.c.mode.fire('input');
-  resolve({ ok: true, blob: async () => new Blob(['old result']) });
+  resolve({ ok: true, json: async () => ({ id: 'job1', state: 'queued' }) });
   await rendering;
   assert.equal(ui.c.download.hidden, true);
   assert.equal(ui.c.result.hidden, true);
+  assert.ok(ui.calls.some(([path, method]) => path === '/api/jobs/job1' && method === 'DELETE'));
+});
+
+test('Einstellungen lassen sich ohne Bild speichern und nach Import vollständig anwenden', async () => {
+  const ui = setup();
+  ui.c.saveSettings.fire('click');
+  assert.equal(ui.c.presetDownload.clicked, true);
+  assert.equal(ui.c.presetDownload.download, 'rasterpilot_einstellungen.json');
+  const data = JSON.parse(ui.ctx.RasterPilotSettings.serialize(
+    { ...ui.ctx.RasterPilotSettings.defaults, mode: 'luminance', ink_color: '#aabbcc', invert: true,
+      black_point: 10, white_point: 240, gamma: 2, width_cm: 20, coverage: 40 },
+    { background: 'checker', color: '#ff0000', zoom: 'actual' }));
+  ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
+  await ui.c.loadSettings.fire('change');
+  assert.equal(ui.c.mode.value, 'luminance');
+  assert.equal(ui.c.ink.value, '#aabbcc');
+  assert.equal(ui.c.invert.checked, true);
+  assert.equal(ui.c.width.value, '20');
+  assert.equal(ui.c.background.value, 'checker');
+  assert.equal(ui.c.zoom.value, 'actual');
+  assert.equal(ui.c.settings.disabled, true);
+  await ui.importImage();
+  await ui.c.render.fire('click');
+  assert.equal(ui.submitted().gamma, 2);
+  assert.equal(ui.submitted().width_cm, 20);
+});
+
+test('Ungültiger Einstellungsimport verändert weder Werte noch vorhandenes Ergebnis', async () => {
+  const { c, importImage } = setup();
+  await importImage();
+  await c.render.fire('click');
+  for (const file of [new Blob(['broken json']), new Blob([JSON.stringify({ version: 99 })]), { size: 65537 }]) {
+    c.loadSettings.files = [file];
+    await c.loadSettings.fire('change');
+    assert.match(c.message.textContent, /nicht geladen/);
+    assert.equal(c.width.value, '28');
+    assert.equal(c.download.hidden, false);
+  }
+});
+
+test('Statusabfrage wartet bis fertig und lädt erst dann das PNG', async () => {
+  const ui = setup({ states: ['queued', 'running', 'done'] });
+  await ui.importImage();
+  await ui.c.render.fire('click');
+  assert.equal(ui.calls.filter(([path, method]) => path === '/api/jobs/job1' && method === 'GET').length, 3);
+  assert.ok(ui.calls.some(([path, method]) => path === '/api/jobs/job1/result' && method === 'GET'));
+  assert.equal(ui.c.download.hidden, false);
+  assert.equal(ui.c.cancel.hidden, true);
+});
+
+test('Abbrechen beendet Statusabfrage und löscht den eigenen Auftrag', async () => {
+  const ui = setup({ states: ['queued'] });
+  await ui.importImage();
+  const rendering = ui.c.render.fire('click');
+  while (!ui.c.message.textContent.includes('Warteschlange')) await new Promise(setImmediate);
+  ui.c.cancel.fire('click');
+  await rendering;
+  assert.ok(ui.calls.some(([path, method]) => path === '/api/jobs/job1' && method === 'DELETE'));
+  assert.equal(ui.c.download.hidden, true);
+  assert.equal(ui.c.render.disabled, false);
+  assert.equal(ui.c.stage.attrs['aria-busy'], 'false');
+  assert.equal(ui.c.cancel.hidden, true);
+});
+
+test('Fehlender Worker und fehlgeschlagene Aufträge geben keinen Download frei', async () => {
+  for (const config of [{ queueError: 'Hintergrunddienst fehlt' }, { states: ['failed'] }]) {
+    const ui = setup(config);
+    await ui.importImage();
+    await ui.c.render.fire('click');
+    assert.equal(ui.c.download.hidden, true);
+    assert.equal(ui.c.render.disabled, false);
+    assert.equal(ui.c.cancel.hidden, true);
+    assert.ok(ui.c.message.textContent);
+  }
 });

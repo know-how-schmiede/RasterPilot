@@ -3,16 +3,23 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RasterPilot – Raster und PNG-Export</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version) }}">
+  <script src="{{ url_for('static', filename='settings.js', v=version) }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v=version) }}" defer></script>
 </head>
 <body>
 <header><div class="wrap brand"><img class="brand-logo" src="{{ url_for('static', filename='rasterpilot-logo.svg') }}" alt="RasterPilot-Logo" width="64" height="64"><div><strong>Raster<span>Pilot</span></strong><p>Vom Bild zum druckfertigen Halbtonraster</p></div></div></header>
 <main class="wrap">
   <div class="intro"><div><span class="eyebrow">BILD → DRUCKGRÖSSE → RASTER → EXPORT</span><h1>Dein Motiv auflockern</h1><p>Berechne ein Halbtonraster mit transparenten Zwischenräumen.</p></div><span class="badge">Experimentell · {{ version }}</span></div>
   <div class="layout"><section class="controls" aria-label="Bildeinstellungen">
+    <details class="advanced"><summary>Einstellungen speichern und laden</summary>
+      <button id="saveSettings" type="button">Einstellungen als JSON speichern</button>
+      <a id="presetDownload" hidden>Einstellungen herunterladen</a>
+      <label>Einstellungen laden <input id="loadSettings" type="file" accept=".json,application/json"></label>
+      <p class="hint">Enthält Druck-, Raster- und Ansichtswerte, keine Bilder. Das Originalbild bei Bedarf erneut auswählen.</p>
+    </details>
     <label class="upload">Bild auswählen <input id="file" type="file" accept="image/png,image/jpeg"></label>
-    <p class="hint">PNG oder JPEG · maximal 20 MiB / 40 Megapixel. Dein Bild wird zur Verarbeitung an diesen RasterPilot-Server übertragen und dort nicht als Datei gespeichert.</p>
+    <p class="hint">PNG oder JPEG · maximal 20 MiB / 40 Megapixel. Dein Bild wird an diesen RasterPilot-Server übertragen. Aufträge und Ergebnisse werden vorübergehend gespeichert und nach {{ retention_minutes }} Minuten automatisch bereinigt, solange der Hintergrunddienst läuft.</p>
     <p id="imageNotes" class="hint"></p>
     <p id="message" role="status" aria-live="polite"></p>
     <fieldset id="settings" disabled><legend>Druckgröße</legend>
@@ -42,6 +49,7 @@
         </details>
       </div>
       <button type="button" id="render" class="primary">Raster berechnen</button>
+      <button type="button" id="cancel" hidden>Berechnung abbrechen</button>
       <a id="download" class="download" hidden>PNG herunterladen</a>
       <p class="hint">PNG mit binärem Alpha, sRGB-Profil und Auflösungsmetadaten. Textilfarbe und Transparenzraster werden nicht exportiert.</p>
     </fieldset>

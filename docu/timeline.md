@@ -1,5 +1,17 @@
 # Timeline
 
+## 0.4.0 – 19. November 2026
+
+- Anwender bestätigt die Rastermodi aus 0.3.0 und beauftragt die nächste Entwicklungsstufe zur Betriebsfähigkeit.
+- Rasterung aus dem Webprozess in einen separaten Worker verlagert. SQLite verwaltet die Warteschlange; eine Betriebssystem-Sperre begrenzt den Worker auf einen gleichzeitig rechnenden Auftrag. Berechnungen laufen in beendbaren Kindprozessen mit standardmäßig 180 Sekunden Zeitlimit.
+- Begrenzung auf vier aktive/wartende Aufträge, einen je Browserzugang, acht gespeicherte Aufträge und 1 GiB reservierten Bildspeicher ergänzt. Signierte HttpOnly-/SameSite-Cookies trennen die Zugänge; Status, Abbruch und Downloads sind an die Sitzung gebunden. Keine zusätzliche Benutzeranmeldung.
+- Private temporäre Originale/Ergebnisse und automatische Bereinigung nach standardmäßig einer Stunde eingeführt. Originale werden nach Abschluss sofort entfernt, abgebrochene Berechnungen aufgeräumt und unterbrochene Aufträge beim Neustart als fehlgeschlagen behandelt. Ohne laufenden Worker erfolgt keine Bereinigung.
+- Statusabfrage und Abbruch in der Oberfläche integriert. Veraltete Upload-Annahmen werden nach Bestätigung verworfen und abgebrochen, bevor neue Aufträge starten. Vollständige Bilder, Rastermodi und das vereinbarte Exportnamensschema bleiben erhalten.
+- Versionierte JSON-Dateien für Druck-, Raster- und Ansichtseinstellungen ergänzt, ohne Bilder oder Server-Aufträge. Imports werden vollständig vor der Übernahme geprüft; ungültige Dateien lassen bisherige Werte und Ergebnisse unverändert. Statische Oberflächendateien erhalten einen Versionsparameter.
+- Installation und Update um gemeinsamen Dienstbaustein, privaten Datenpfad, Worker-Systemdienst und `/ready`-Prüfung erweitert. Rückfall stellt die vorherige Webversion und einen zuvor vorhandenen Worker wieder her. Für Altinstallationen zuerst den Updater erneuern; Schritte in beiden Installationsdokumenten nachgeführt.
+- 48 Python-Tests und 29 JavaScript-/Skripttests erfolgreich. Echte separate Worker-Prozesse, parallele Kapazitätsprüfung, Cookie-Zuordnung über mehrere Webinstanzen, Zugriffstrennung, Zeitlimit, Abbruch, Neustart und Bereinigung geprüft. Isolierte Dienst-/Updatetests decken Erfolgsfall sowie Konfigurations- und Bereitschaftsfehler mit Rückfall ab; Shell-Syntaxprüfungen erfolgreich.
+- Ein unverändertes Original in drei getrennten Browserzugängen mit allen Rastermodi über die neue Queue verarbeitet: jeweils 3307 × 4419 Pixel, binäres Alpha und 300 ppi, maximal ein laufender Auftrag, lokal etwa 9,1 Sekunden Gesamtdauer. Echte Debian-Installation/Umstellung, visuelle Browserprüfung der neuen Bedienelemente, LXC-Lasttest und Druckabnahme bleiben offen.
+
 ## 0.3.0 – 19. November 2026
 
 - Anwender bestätigt die Exportbenennung und beauftragt den nächsten Punkt des Etappenplans. Weitere Rastermodi als nächste Entwicklungsstufe umgesetzt.

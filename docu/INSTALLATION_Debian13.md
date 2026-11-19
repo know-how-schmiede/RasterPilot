@@ -1,10 +1,10 @@
 # RasterPilot unter Debian 13 installieren
 
-Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch installierten Debian-13-Rechner oder einen unprivilegierten Debian-13-LXC unter Proxmox. RasterPilot bietet experimentelle farbige Rasterung und PNG-Export; Druckprofile sind noch nicht kalibriert. Das Skript richtet Python, Gunicorn, Nginx und einen automatisch startenden Dienst ein. Eine lokale Kopie des GitHub-Repositories ist nicht erforderlich.
+Diese Anleitung richtet sich an Einsteiger und verwendet einen eigenen, frisch installierten Debian-13-Rechner oder einen unprivilegierten Debian-13-LXC unter Proxmox. RasterPilot bietet experimentelle farbige Rasterung und PNG-Export; Druckprofile sind noch nicht kalibriert. Das Skript richtet Python, Gunicorn, Nginx und automatisch startende Dienste für Web und Hintergrundverarbeitung ein. Eine lokale Kopie des GitHub-Repositories ist nicht erforderlich.
 
 ## Voraussetzungen
 
-- Debian 13 mit Internetzugang und mindestens 2 CPU-Kernen sowie 4 GB RAM als vorläufige Empfehlung.
+- Debian 13 mit Internetzugang und mindestens 2 CPU-Kernen sowie 4 GB RAM als vorläufige Empfehlung. Zusätzlich zur Anwendung und den Releases bis zu 1 GiB freien Speicher für temporäre Bilddaten einplanen.
 - Zugang zur Konsole als `root` oder die Möglichkeit, mit `su -` und dem root-Passwort zur root-Shell zu wechseln. Im Proxmox-LXC kann die Konsole über die Proxmox-Oberfläche geöffnet werden. Ein bereits eingerichteter Benutzer mit installiertem `sudo` und passenden Rechten kann es alternativ verwenden.
 - Ein eigenes System für RasterPilot: Das Skript ersetzt die aktivierte Nginx-Standardseite und belegt Port 80. Es ist nicht für einen bereits anderweitig eingerichteten Webserver gedacht.
 - Das GitHub-Repository muss für diesen Installationsweg öffentlich sein. Prüfen lässt sich das durch Öffnen von `https://github.com/know-how-schmiede/RasterPilot` in einem privaten Browserfenster ohne GitHub-Anmeldung. Für die Python-Pakete wird ebenfalls Internetzugang benötigt.
@@ -53,7 +53,7 @@ Auf der Serverkonsole als root ausführen:
 
 Fehlt `sudo`, installiert die aktuelle Skriptversion das Paket zunächst über `apt-get` nach. Dafür benötigt sie ebenfalls root-Rechte. Bei einem Paketfehler bricht sie vor dem Anlegen oder Aktivieren einer neuen Anwendungsversion ab. Ein bereits berechtigter Benutzer mit installiertem `sudo` kann alternativ `sudo /usr/local/bin/rasterpilot-update` verwenden. Das Paket allein verleiht einem Benutzer keine sudo-Rechte.
 
-Das Skript lädt den aktuellen Stand des Standard-Branches, installiert ihn in einer neuen Umgebung und startet den Dienst neu. Während des Neustarts ist die Anwendung kurz nicht erreichbar. Bei einem fehlgeschlagenen Start versucht das Skript, die vorherige Version wiederherzustellen. Alte Versionen bleiben unter `/opt/rasterpilot/releases` erhalten und belegen Speicherplatz. Das Update kann spätere Anpassungen an Nginx oder dem systemd-Dienst nicht automatisch übernehmen; Hinweise zu solchen Änderungen stehen gegebenenfalls in der jeweiligen Veröffentlichung.
+Das aktuelle Updateskript lädt den Standard-Branch und bereitet die neue Umgebung vor. Ab 0.4.0 beendet es Web und Worker vor dem Umschalten, aktualisiert den app-eigenen Worker-Dienst sowie ein Web-Drop-in und startet beide gemeinsam. `/ready` prüft anschließend auch den Worker. Bei einem Fehler ab dem Stoppen versucht das Skript, die vorherige Version samt zuvor vorhandenem Worker wiederherzustellen; bei einer Rückkehr auf einen Stand ohne Worker wird dieser deaktiviert. Eigene Dienst-Drop-ins, `/etc/rasterpilot/environment` und Nginx bleiben erhalten. Laufende Aufträge werden unterbrochen und müssen erneut gestartet werden. Frühere Versionen bleiben unter `/opt/rasterpilot/releases` erhalten. Für den ersten Wechsel von einer älteren Version unbedingt den Abschnitt „Update auf 0.4.0“ beachten.
 
 ### Meldung „sudo: command not found“
 
@@ -71,7 +71,7 @@ install -m 755 /tmp/rasterpilot-update.sh /usr/local/bin/rasterpilot-update &&
 
 Sobald Version 0.2.0 auf GitHub veröffentlicht ist, zunächst `rasterpilot-update` ausführen. Ein bereits vor der Rechtekorrektur installiertes Updateskript muss vorher wie unten im Abschnitt zum 502-Fehler beschrieben ersetzt werden.
 
-Ab 0.2.0 werden Bilder zur Berechnung an den eigenen Server übertragen und im Arbeitsspeicher verarbeitet. Dateien dürfen 20 MiB und 40 Megapixel nicht überschreiten; Ausgaben sind seit 0.2.2 auf 40 Megapixel und 12000 Pixel je Kante begrenzt (zuvor 12 Megapixel). Eine Berechnung bindet derzeit einen Webprozess; eine Warteschlange und ein separater Worker folgen später. Originale und Ergebnisse werden nicht als Dateien gespeichert. Bei Installationen von vor 0.2.0 muss Nginx für diesen Ablauf ebenfalls angepasst werden; ein Quellcodeupdate allein ändert dessen Konfiguration nicht.
+Ab 0.2.0 werden Bilder an den eigenen Server übertragen. Dateien dürfen 20 MiB und 40 Megapixel nicht überschreiten; Ausgaben sind seit 0.2.2 auf 40 Megapixel/12000 Pixel je Kante begrenzt. Ab 0.4.0 liegen Originale und Ergebnisse zeitlich begrenzt im privaten Auftragsverzeichnis, und ein eigener Worker übernimmt die Berechnung. Bei Installationen von vor 0.2.0 muss Nginx für den Bildtransfer ebenfalls wie nachfolgend angepasst werden; das Update verändert Nginx weiterhin nicht.
 
 Bei einer bestehenden Installation als root die Konfiguration sichern und öffnen:
 
@@ -110,6 +110,44 @@ Ein synthetischer Test nahe der neuen Exportgrenze ist möglich mit:
 ```
 
 `--source-side 6000 --pattern gradient` prüft zusätzlich ein großes dekodiertes Original. Den Test bei freiem System ausführen, um eine einzelne Berechnung zu messen. Lokale Windows-Messungen stehen in der [Architektur](ARCHITEKTUR.md); sie ersetzen keinen parallelen Lasttest im LXC.
+
+## Update auf 0.4.0: Hintergrundverarbeitung
+
+Für den Wechsel von einer älteren Version muss zuerst der Updater erneuert werden: Ein alter Updater richtet den neuen Hintergrunddienst nicht ein. Nach Veröffentlichung der Version auf GitHub als root ausführen:
+
+```sh
+curl -fL https://raw.githubusercontent.com/know-how-schmiede/RasterPilot/main/scripts/update.sh -o /tmp/rasterpilot-update.sh &&
+install -m 755 /tmp/rasterpilot-update.sh /usr/local/bin/rasterpilot-update &&
+/usr/local/bin/rasterpilot-update
+```
+
+Eine Neuinstallation ist nicht erforderlich. Der aktualisierte Updater richtet `rasterpilot-worker.service` und `/etc/systemd/system/rasterpilot.service.d/worker.conf` ein. Eigene Drop-ins bleiben erhalten; den app-eigenen Worker-Dienst und `worker.conf` nicht direkt bearbeiten. Beide Dienste verwenden `/var/lib/rasterpilot/jobs`. Bestehende Nginx-Einstellungen ab 0.2.0 bleiben gültig. Während der Umstellung werden laufende Berechnungen beendet. Danach die Browserseite mit Strg+F5 vollständig neu laden.
+
+Web und Hintergrunddienst kontrollieren:
+
+```sh
+systemctl status rasterpilot rasterpilot-worker --no-pager -l
+curl --fail --show-error http://127.0.0.1:8000/ready
+journalctl -u rasterpilot -u rasterpilot-worker -n 50 --no-pager
+```
+
+`/health` prüft weiterhin nur den Webstart. `/ready` muss HTTP 200 mit `status: ok` liefern; HTTP 503 bedeutet einen fehlenden oder nicht mehr aktuellen Worker-Heartbeat. „Hintergrunddienst nicht bereit“ im Browser: zunächst `systemctl restart rasterpilot-worker` und das Protokoll prüfen. Nach einem Worker-Neustart werden unterbrochene laufende Aufträge als fehlgeschlagen gemeldet; wartende Aufträge können weiterverarbeitet werden.
+
+Standardgrenzen: ein rechnender Auftrag, höchstens vier aktive/wartende und acht gespeicherte Aufträge, 1 GiB reservierter temporärer Bildspeicher, eine Stunde Aufbewahrung und 180 Sekunden je Berechnung. Zusätzlich zu Anwendung und Releases entsprechend freien Speicherplatz für die temporären Daten vorsehen. Abgelaufene Dateien werden nur bei laufendem Worker bereinigt. Die Höchstzahl gilt über alle Zugänge; je Browserprofil ist nur ein aktiver Auftrag erlaubt. Alle bisherigen Upload- und Ausgabegrenzen gelten weiter. Sitzungscookies trennen Aufträge verschiedener Browserzugänge, ersetzen aber keine Benutzeranmeldung; weiterhin nur im vertrauenswürdigen Netz betreiben.
+
+Optionale Einstellungen können in `/etc/rasterpilot/environment` liegen. Das Verzeichnis und die Datei selbst als root anlegen und nur für root lesbar halten. Beispiel für kleinere Grenzen:
+
+```ini
+RASTERPILOT_QUEUE_LIMIT=2
+RASTERPILOT_RETAINED_JOBS=4
+RASTERPILOT_STORAGE_MIB=512
+RASTERPILOT_JOB_TTL=3600
+RASTERPILOT_JOB_TIMEOUT=180
+```
+
+Zulässige Bereiche: Warteschlange 1–4, gespeicherte Aufträge 1–8, Speicher 32–1024 MiB, Aufbewahrung 60–86400 Sekunden und Berechnungszeit 1–600 Sekunden. Kleine Speichergrenzen können große Ausgaben bereits bei der Annahme ausschließen. Bei eingerichtetem HTTPS zusätzlich `RASTERPILOT_COOKIE_SECURE=1` setzen; für den bisherigen HTTP-Zugang weglassen. Web und Worker anschließend gemeinsam mit `systemctl restart rasterpilot-worker rasterpilot` neu starten. Eigene Umgebungsdateien werden beim Update erhalten.
+
+Diese Einrichtung und die Rückfallpfade sind lokal mit isolierten Systembefehlen getestet. Eine echte Neuinstallation/Umstellung auf Debian 13 sowie ein paralleler Lasttest im 4-GB-LXC stehen für 0.4.0 noch aus.
 
 ## Status und Fehlerbehebung
 
@@ -162,4 +200,4 @@ systemctl status nginx
 
 Ist die Seite nicht erreichbar, zuerst Server-IP, Netzwerk und Firewall prüfen. Ein Fehler bei `apt` oder beim Herunterladen weist häufig auf fehlenden Internetzugang oder DNS hin. Bei einem Fehler nach bereits erfolgter Installation zunächst die obigen Statusmeldungen prüfen; ein erneutes Installationsskript überschreibt eine bestehende Installation nicht. Der Dienst lässt sich mit `systemctl restart rasterpilot` neu starten.
 
-Die Anwendung liegt unter `/opt/rasterpilot`, der Dienst läuft als eigener Systembenutzer `rasterpilot`. Laufzeitdaten sind unter `/var/lib/rasterpilot` vorgesehen; aktuell gibt es noch keine gespeicherten Benutzerprojekte. Vor späteren Updates sollten dort vorhandene Daten und eigene Konfigurationen gesichert werden.
+Die Anwendung liegt unter `/opt/rasterpilot`, Web und Worker laufen als eigener Systembenutzer `rasterpilot`. Unter `/var/lib/rasterpilot/jobs` liegen SQLite-Auftragsstatus, temporäre Originale/Ergebnisse, Worker-Sperre und der gemeinsame Sitzungsschlüssel. Es gibt keine dauerhaften Benutzerprojekte. Das Verzeichnis ist ausschließlich für RasterPilot-Aufträge bestimmt. `session.key` und eigene Betriebskonfiguration bei Bedarf sichern; temporäre Bilder nicht in reguläre Sicherungen übernehmen. Die Dateien nicht während laufender Dienste manuell löschen. Eine Schlüsseländerung macht bestehende Browserzuordnungen ungültig.

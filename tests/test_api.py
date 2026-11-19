@@ -1,6 +1,7 @@
 from io import BytesIO
 import json
 import unittest
+from tempfile import TemporaryDirectory
 from urllib.parse import unquote
 
 import numpy as np
@@ -10,14 +11,30 @@ from werkzeug.test import stream_encode_multipart
 
 from rasterpilot import create_app
 from test_processing import encoded, options
+from rasterpilot.worker import process_one
 
 
 class ImageApiTest(unittest.TestCase):
     def setUp(self):
-        self.app = create_app()
+        self.temp = TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.app = create_app({'DATA_DIR': self.temp.name, 'SECRET_KEY': 'test'})
+        self.store = self.app.extensions['jobs']
+        self.store.heartbeat()
         self.app.testing = True
         self.client = self.app.test_client()
         self.headers = {'X-RasterPilot-Request': '1'}
+
+    def render(self, data, headers=None):
+        response = self.client.post('/api/jobs', data=data, headers=self.headers if headers is None else headers)
+        if response.status_code != 202:
+            return response
+        job_id = response.json['id']
+        self.assertTrue(process_one(self.store))
+        result = self.client.get(f'/api/jobs/{job_id}/result', headers=self.headers, buffered=True)
+        self.client.delete(f'/api/jobs/{job_id}', headers=self.headers)
+        self.store.cleanup()
+        return result
 
     def data(self, **changes):
         return dict(image=(encoded(Image.new('RGBA', (256, 256), 'white'), format='PNG'), 'motiv.png'),
@@ -33,7 +50,7 @@ class ImageApiTest(unittest.TestCase):
         response.close()
 
     def test_render_is_an_attachment_with_expected_png_and_metadata(self):
-        response = self.client.post('/api/render', data=self.data(angle_deg=45), headers=self.headers)
+        response = self.render(data=self.data(angle_deg=45), headers=self.headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, 'image/png')
         self.assertIn('motiv_rp_25.4_256ppi_45G.png', response.headers['Content-Disposition'])
@@ -47,7 +64,7 @@ class ImageApiTest(unittest.TestCase):
     def test_export_name_preserves_unicode_and_dots_with_print_settings(self):
         data = self.data(width_cm=2.81, ppi=100, angle_deg=-45)
         data['image'] = (data['image'][0], 'Eichhörnchen.v2.JPEG')
-        response = self.client.post('/api/render', data=data, headers=self.headers)
+        response = self.render(data=data, headers=self.headers)
         self.assertEqual(response.status_code, 200)
         expected = 'Eichhörnchen.v2_rp_28.1_100ppi_-45G.png'
         self.assertEqual(unquote(response.headers['X-Download-Name']), expected)
@@ -67,7 +84,7 @@ class ImageApiTest(unittest.TestCase):
                 data = self.data(angle_deg=-0.0)
                 # Backslashes im zitierten Multipart-Dateinamen maskieren.
                 data['image'] = (data['image'][0], name.replace('\\', '\\\\'))
-                response = self.client.post('/api/render', data=data, headers=self.headers)
+                response = self.render(data=data, headers=self.headers)
                 self.assertEqual(response.status_code, 200)
                 filename = unquote(response.headers['X-Download-Name'])
                 self.assertEqual(filename, expected_stem + '_rp_25.4_256ppi_0G.png')
@@ -77,7 +94,7 @@ class ImageApiTest(unittest.TestCase):
     def test_cross_site_and_simple_form_requests_are_rejected(self):
         for headers in ({}, {**self.headers, 'Origin': 'https://foreign.example'},
                         {**self.headers, 'Origin': 'null'}, {**self.headers, 'Origin': 'http://[bad'}):
-            response = self.client.post('/api/render', data=self.data(), headers=headers)
+            response = self.render(data=self.data(), headers=headers)
             self.assertEqual(response.status_code, 403)
             self.assertNotIn('Access-Control-Allow-Origin', response.headers)
 
@@ -87,7 +104,7 @@ class ImageApiTest(unittest.TestCase):
             data = dict(image=(encoded(source, format='PNG'), 'motiv.png'),
                         parameters=json.dumps(options(coverage=100, angle_deg=-30,
                             x=128, y=0, crop_width=128, crop_height=128)))
-            response = self.client.post('/api/render', data=data, headers=self.headers)
+            response = self.render(data=data, headers=self.headers)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers['X-Image-Width'], '256')
             self.assertEqual(response.headers['X-Image-Height'], '128')
@@ -96,7 +113,7 @@ class ImageApiTest(unittest.TestCase):
             response.close()
 
     def test_same_origin_request_works(self):
-        response = self.client.post('/api/render', data=self.data(),
+        response = self.render(data=self.data(),
                                     headers={**self.headers, 'Origin': 'http://localhost'})
         self.assertEqual(response.status_code, 200)
         response.close()
@@ -109,7 +126,7 @@ class ImageApiTest(unittest.TestCase):
                      self.data(mode='luminance', gamma=0), self.data(mode='luminance', ink_color='red'),
                      self.data(mode='luminance', black_point=200, white_point=100)):
             with self.subTest():
-                response = self.client.post('/api/render', data=data, headers=self.headers)
+                response = self.render(data=data, headers=self.headers)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn('error', response.json)
 
@@ -120,7 +137,7 @@ class ImageApiTest(unittest.TestCase):
                 with Image.new('RGBA', (256, 128), (0, 0, 0, 255)) as source:
                     source.paste((0, 0, 0, 0), (0, 0, 128, 128))
                     data['image'] = (encoded(source, format='PNG'), 'original.png')
-                response = self.client.post('/api/render', data=data, headers=self.headers)
+                response = self.render(data=data, headers=self.headers)
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(unquote(response.headers['X-Download-Name']), 'original_rp_25.4_256ppi_0G.png')
                 with Image.open(BytesIO(response.data)) as result:

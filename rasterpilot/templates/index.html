@@ -7,7 +7,7 @@
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
-<header><div class="wrap"><strong>Raster<span>Pilot</span></strong><p>Vom Bild zum druckfertigen Halbtonraster</p></div></header>
+<header><div class="wrap brand"><img class="brand-logo" src="{{ url_for('static', filename='rasterpilot-logo.svg') }}" alt="RasterPilot-Logo" width="64" height="64"><div><strong>Raster<span>Pilot</span></strong><p>Vom Bild zum druckfertigen Halbtonraster</p></div></div></header>
 <main class="wrap">
   <div class="intro"><div><span class="eyebrow">BILD → DRUCKGRÖSSE → RASTER → EXPORT</span><h1>Dein Motiv auflockern</h1><p>Berechne ein farbiges Punktraster mit transparenten Zwischenräumen.</p></div><span class="badge">Experimentell · {{ version }}</span></div>
   <div class="layout"><section class="controls" aria-label="Bildeinstellungen">
@@ -30,12 +30,17 @@
       <button type="button" id="render" class="primary">Raster berechnen</button>
       <a id="download" class="download" hidden>PNG herunterladen</a>
       <p class="hint">PNG mit binärem Alpha, sRGB-Profil und Auflösungsmetadaten. Textilfarbe und Transparenzraster werden nicht exportiert.</p>
-      <h2>Ansicht</h2>
+    </fieldset>
+  </section><section class="preview" aria-label="Bildvorschau">
+    <div class="preview-head"><h2>Vorschau</h2><span id="renderState">Noch kein aktuelles Raster</span></div>
+    <fieldset id="viewSettings" class="view-settings" disabled><legend>Ansicht</legend>
+      <div class="view-controls">
       <label>Vergleich <select id="view"><option value="original">Originalbild</option><option id="resultOption" value="result" disabled>Rasterergebnis</option></select></label>
       <label>Zoom <select id="zoom" disabled><option value="fit">Einpassen</option><option value="actual">100 % · Exportpixel prüfen</option></select></label>
       <label>Hintergrund <select id="background"><option value="textile">Textilfarbe</option><option value="checker">Transparenzraster</option></select></label>
       <label>Textilfarbe <input id="color" type="color" value="#233246"></label>
+      </div>
     </fieldset>
-  </section><section class="preview" aria-label="Bildvorschau"><div class="preview-head"><h2>Vorschau</h2><span id="renderState">Noch kein aktuelles Raster</span></div><div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes farbiges Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du das Bild durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p></section></div>
+    <div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes farbiges Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du das Bild durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p></section></div>
 </main><footer class="wrap">RasterPilot · Druckmaße im RIP prüfen und vor der Produktion einen Testdruck durchführen.</footer>
 </body></html>

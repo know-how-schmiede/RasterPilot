@@ -9,12 +9,12 @@ function setup({ sourceWidth = 256, sourceHeight = 256 } = {}) {
   const defaults = { width: '28', ppi: '300', angle: '0',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
-    'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'empty', 'imageNotes'];
+    'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
       value: defaults[name] || '', dataset: {}, style: {}, hidden: ['result', 'canvas', 'download'].includes(name),
-      disabled: ['settings', 'zoom'].includes(name), textContent: '', files: [], attrs: {},
+      disabled: ['settings', 'viewSettings', 'zoom'].includes(name), textContent: '', files: [], attrs: {},
       addEventListener(event, callback) { listeners[event] = callback; },
       fire(event) { return listeners[event]({ target: this }); },
       setAttribute(key, value) { this.attrs[key] = value; },
@@ -52,6 +52,7 @@ test('Import, Berechnung, Download und reine Ansichtsänderungen', async () => {
   const { c, importImage } = setup();
   await importImage();
   assert.equal(c.settings.disabled, false);
+  assert.equal(c.viewSettings.disabled, false);
   assert.equal(c.canvas.hidden, false);
   assert.match(c.dimensions.textContent, /3307 × 3307 px/);
   assert.equal(c.stage.attrs['aria-busy'], 'false');
@@ -159,6 +160,7 @@ test('Fehlgeschlagener Neuimport gibt kein altes Ergebnis frei', async () => {
   c.file.files = [{ size: 21 * 1024 * 1024 }];
   await c.file.fire('change');
   assert.equal(c.settings.disabled, true);
+  assert.equal(c.viewSettings.disabled, true);
   assert.equal(c.download.hidden, true);
   assert.equal(c.result.hidden, true);
   assert.match(c.message.textContent, /20 MiB/);

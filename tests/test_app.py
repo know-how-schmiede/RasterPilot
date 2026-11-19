@@ -17,7 +17,7 @@ class AppTest(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('Dein Motiv auflockern', response.get_data(as_text=True))
-        for path in ('/static/app.js', '/static/style.css'):
+        for path in ('/static/app.js', '/static/style.css', '/static/rasterpilot-logo.svg'):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             response.close()

@@ -1,5 +1,12 @@
 # Timeline
 
+## 0.2.4 – 19. November 2026
+
+- Vorhandenes RasterPilot-Logo links in die Top-Leiste integriert und als statische Anwendungsdatei eingebunden.
+- Ansichtseinstellungen für Vergleich, Zoom, Hintergrund und Textilfarbe direkt über die Bildvorschau verschoben. Die Felder ordnen sich je nach verfügbarer Breite in einer oder zwei Spalten an.
+- Das eigene Ansichts-Bedienfeld wird nach erfolgreichem Bildimport aktiviert und bei einem Neuimport wieder gesperrt. Ansichtsänderungen erhalten weiterhin den aktuellen Download.
+- Bedienungsanleitung aktualisiert. Zwei Anwendungstests und acht JavaScript-Zustandstests erfolgreich; ausgeliefertes HTML auf Position und Zuordnung der Ansichtsfelder sowie SVG-Auslieferung geprüft. Keine visuelle Browserprüfung durchgeführt.
+
 ## 0.2.3 – 19. November 2026
 
 - Anwender bestätigt den bisherigen Ablauf als funktionierend und wünscht vorerst vollständige Bilder ohne Ausschnittbereich.

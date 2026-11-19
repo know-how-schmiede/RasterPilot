@@ -33,7 +33,7 @@ Die Kreispunktfläche wird aus der Deckung bestimmt. Bei hohen Deckungen berühr
 
 ## 4. Prüfen und herunterladen
 
-Unter „Vergleich“ zwischen Originalbild und Rasterergebnis wechseln. Das Original ist eine auf 1600 Pixel Kantenlänge begrenzte Vorschau; das Rasterergebnis stammt direkt aus der vollständigen Exportdatei.
+Die Einstellungen unter „Ansicht“ befinden sich direkt über der Bildvorschau. Unter „Vergleich“ zwischen Originalbild und Rasterergebnis wechseln. Das Original ist eine auf 1600 Pixel Kantenlänge begrenzte Vorschau; das Rasterergebnis stammt direkt aus der vollständigen Exportdatei.
 
 „Einpassen“ zeigt das gesamte Ergebnis. „100 % · Exportpixel prüfen“ zeigt einen Bildpixel je CSS-Pixel; bei großen Dateien innerhalb der Vorschau scrollen. Die verkleinerte Darstellung kann feine Raster verfälschen. Browserzoom beeinflusst die Bildschirmgröße zusätzlich.
 

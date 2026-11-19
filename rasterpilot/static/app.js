@@ -106,6 +106,7 @@ $('file').addEventListener('change', async event => {
   if (image) image.close();
   image = null; originalFile = null;
   $('settings').disabled = true;
+  $('viewSettings').disabled = true;
   $('canvas').hidden = true;
   $('empty').hidden = false;
   $('dimensions').textContent = '';
@@ -125,6 +126,7 @@ $('file').addEventListener('change', async event => {
     sourceHeight = Number(response.headers.get('X-Image-Height'));
     $('imageNotes').textContent = JSON.parse(response.headers.get('X-Image-Notes') || '[]').join(' ');
     $('settings').disabled = false;
+    $('viewSettings').disabled = false;
     $('empty').hidden = true;
     renderOriginal();
   } catch (error) {

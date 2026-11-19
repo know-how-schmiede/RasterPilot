@@ -1,6 +1,7 @@
 from io import BytesIO
 import json
 import unittest
+from urllib.parse import unquote
 
 import numpy as np
 from PIL import Image
@@ -35,12 +36,43 @@ class ImageApiTest(unittest.TestCase):
         response = self.client.post('/api/render', data=self.data(angle_deg=45), headers=self.headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, 'image/png')
-        self.assertIn('motiv_rasterpilot_25.4mm_256ppi.png', response.headers['Content-Disposition'])
+        self.assertIn('motiv_rp_25.4_256ppi_45G.png', response.headers['Content-Disposition'])
+        self.assertEqual(unquote(response.headers['X-Download-Name']), 'motiv_rp_25.4_256ppi_45G.png')
         self.assertEqual(response.headers['Cache-Control'], 'no-store')
         with Image.open(BytesIO(response.data)) as image:
             self.assertEqual(image.size, (256, 256))
             self.assertAlmostEqual(image.info['dpi'][0], 256, delta=0.02)
         response.close()
+
+    def test_export_name_preserves_unicode_and_dots_with_print_settings(self):
+        data = self.data(width_cm=2.81, ppi=100, angle_deg=-45)
+        data['image'] = (data['image'][0], 'Eichhörnchen.v2.JPEG')
+        response = self.client.post('/api/render', data=data, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        expected = 'Eichhörnchen.v2_rp_28.1_100ppi_-45G.png'
+        self.assertEqual(unquote(response.headers['X-Download-Name']), expected)
+        disposition = response.headers['Content-Disposition']
+        self.assertIn("filename*=UTF-8''", disposition)
+        self.assertEqual(unquote(disposition.split("filename*=UTF-8''", 1)[1]), expected)
+        response.close()
+
+    def test_export_name_removes_paths_and_invalid_characters_and_limits_length(self):
+        for name, expected_stem in (
+                ('C:\\fakepath\\mein Motiv.png', 'mein Motiv'),
+                ('../../mein:Motiv?.jpg', 'mein_Motiv_'),
+                ('motiv', 'motiv'),
+                ('.png', 'motiv'),
+                ('ä' * 200 + '.png', 'ä' * 116)):
+            with self.subTest(name=name):
+                data = self.data(angle_deg=-0.0)
+                # Backslashes im zitierten Multipart-Dateinamen maskieren.
+                data['image'] = (data['image'][0], name.replace('\\', '\\\\'))
+                response = self.client.post('/api/render', data=data, headers=self.headers)
+                self.assertEqual(response.status_code, 200)
+                filename = unquote(response.headers['X-Download-Name'])
+                self.assertEqual(filename, expected_stem + '_rp_25.4_256ppi_0G.png')
+                self.assertLessEqual(len(filename.encode('utf-8')), 255)
+                response.close()
 
     def test_cross_site_and_simple_form_requests_are_rejected(self):
         for headers in ({}, {**self.headers, 'Origin': 'https://foreign.example'},

@@ -4,7 +4,8 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-function setup({ sourceWidth = 256, sourceHeight = 256 } = {}) {
+function setup({ sourceWidth = 256, sourceHeight = 256,
+  downloadName = 'motiv_rp_280_300ppi_0G.png' } = {}) {
   const controls = {};
   const defaults = { width: '28', ppi: '300', angle: '0',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
@@ -36,7 +37,8 @@ function setup({ sourceWidth = 256, sourceHeight = 256 } = {}) {
       if (pending && path.endsWith('render')) return pending;
       return {
         ok: true, blob: async () => new Blob(['png']),
-        headers: new Map([['X-Image-Width', String(sourceWidth)], ['X-Image-Height', String(sourceHeight)], ['X-Image-Notes', '[]']])
+        headers: new Map([['X-Image-Width', String(sourceWidth)], ['X-Image-Height', String(sourceHeight)],
+          ['X-Image-Notes', '[]'], ['X-Download-Name', encodeURIComponent(downloadName)]])
       };
     }
   });
@@ -58,7 +60,7 @@ test('Import, Berechnung, Download und reine Ansichtsänderungen', async () => {
   assert.equal(c.stage.attrs['aria-busy'], 'false');
   await c.render.fire('click');
   assert.equal(c.download.hidden, false);
-  assert.equal(c.download.download, 'motiv_rasterpilot_280mm_300ppi.png');
+  assert.equal(c.download.download, 'motiv_rp_280_300ppi_0G.png');
   assert.equal(c.result.hidden, false);
   c.color.value = '#ff0000'; c.color.fire('input');
   assert.equal(c.download.hidden, false);
@@ -68,6 +70,16 @@ test('Import, Berechnung, Download und reine Ansichtsänderungen', async () => {
   c.coverage.value = '40'; c.coverage.fire('input');
   assert.equal(c.download.hidden, true);
   assert.equal(c.download.href, undefined);
+});
+
+test('Download übernimmt den Unicode-Dateinamen und Winkel aus der Serverantwort', async () => {
+  const downloadName = 'Eichhörnchen.v2_rp_280_300ppi_-45G.png';
+  const { c, importImage } = setup({ downloadName });
+  await importImage();
+  c.angle.value = '-45'; c.angle.fire('input');
+  await c.render.fire('click');
+  assert.equal(c.download.download, downloadName);
+  assert.equal(c.download.hidden, false);
 });
 
 test('Verspätetes Ergebnis überschreibt keine neuen Einstellungen', async () => {

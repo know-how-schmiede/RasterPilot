@@ -8,6 +8,8 @@ Zwei zustandslose Endpunkte sind implementiert: `/api/prepare` liefert eine norm
 
 Die Ergebnisvorschau und der Download verwenden dasselbe berechnete PNG. Originalvergleich, Textilfarbe, Transparenzraster und eine Ansicht mit einem Bildpixel je CSS-Pixel ergänzen die Prüfung. Änderungen an Parametern entwerten das bisherige Ergebnis. Automatische Druckprofilprüfung und physische Kalibrierung bleiben spätere Schritte.
 
+Seit 0.2.5 bildet der Server den Exportnamen zentral aus Originalnamen ohne Endung, Druckbreite in mm, ppi und Rasterwinkel: `<Originalname>_rp_<Breite>_<ppi>ppi_<Winkel>G.png`. Er entfernt Pfadanteile, ersetzt unzulässige Dateinamenzeichen und begrenzt den Namen auf 255 UTF-8-Bytes, wobei der vollständige Parametersuffix erhalten bleibt. Neben `Content-Disposition` liefert er den Namen URL-kodiert im ASCII-Header `X-Download-Name`; die Oberfläche dekodiert diesen für den Blob-Download, statt den Namen erneut zu berechnen. Unicode, Leerzeichen und weitere Punkte im Originalnamen bleiben erhalten.
+
 ### Rasterformel
 
 Für den Winkel θ (−180° bis +180°, Standard 0°) und Pixelmitten x,y gilt zunächst `a = (cos(θ) × x + sin(θ) × y) / s`, `b = (−sin(θ) × x + cos(θ) × y) / s`. Mit `u = (a mod 1) − 0,5`, `v = (b mod 1) − 0,5` entsteht die periodische Einheitszelle. Positive Winkel drehen das Raster im Uhrzeigersinn um die linke obere Bildkante. Das Bild bleibt unverändert ausgerichtet und behält seine vollständigen Abmessungen.

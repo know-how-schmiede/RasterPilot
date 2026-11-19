@@ -144,7 +144,7 @@ Rasterung nach der finalen Zielgrößenberechnung durchführen. Danach keine Wei
 
 Mindestpunktdurchmesser und Mindestlücke aus einem Druckprofil beziehen. Zusätzlich die nach Pixelrundung tatsächlich erzeugten Strukturen prüfen, einschließlich Motivrändern. Zu kleine Merkmale melden oder nach einer dokumentierten Profilregel behandeln. Eine automatische Bereinigung darf nicht unbemerkt wichtige Details löschen.
 
-Export als sRGB-PNG mit Transparenz, korrekten Pixelmaßen und Auflösungsmetadaten. Keine Textilfarbe und kein Schachbrett in das Exportbild einrechnen. Dateiname beispielsweise `motiv_rasterpilot_280mm_300ppi.png`. Eine eingestellte Druckbreite muss in der RIP-Software zusätzlich überprüfbar sein, da Programme Auflösungsmetadaten unterschiedlich auswerten können.
+Export als sRGB-PNG mit Transparenz, korrekten Pixelmaßen und Auflösungsmetadaten. Keine Textilfarbe und kein Schachbrett in das Exportbild einrechnen. Dateiname nach dem Muster `<Originalname ohne Endung>_rp_<Druckbreite in mm>_<Auflösung>ppi_<Winkel>G.png`, beispielsweise `Eichhörnchen_rp_280_300ppi_45G.png`. Auf Anwenderwunsch Unterstriche als Trennzeichen verwenden. Originalnamen einschließlich Unicode erhalten; Pfade entfernen, unzulässige Zeichen ersetzen und bei überlangen Namen den Parametersuffix vollständig erhalten. Der Server legt den Namen für API und Browserdownload zentral fest. Eine eingestellte Druckbreite muss in der RIP-Software zusätzlich überprüfbar sein, da Programme Auflösungsmetadaten unterschiedlich auswerten können.
 
 ## 6. Oberfläche und Einstellungen
 

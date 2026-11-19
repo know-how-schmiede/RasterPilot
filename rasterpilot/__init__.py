@@ -2,13 +2,27 @@
 
 from io import BytesIO
 import json
-from urllib.parse import urlsplit
+import re
+from urllib.parse import quote, urlsplit
 
 from flask import Flask, Request, jsonify, render_template, request, send_file
 
 from .processing import ImageError, Parameters, load_image, prepare_preview, render_png
 
 from .version import __version__
+
+
+def export_filename(original_name, parameters):
+    """Originalnamen ohne Pfad/Endung als portablen PNG-Downloadnamen verwenden."""
+    name = re.split(r'[/\\]', original_name or '')[-1]
+    stem = name.rsplit('.', 1)[0] if '.' in name else name
+    stem = re.sub(r'[\x00-\x1f\x7f<>:"/\\|?*]', '_', stem).strip(' .') or 'motiv'
+    angle = parameters.angle_deg or 0  # Keine negative Null im Dateinamen.
+    suffix = f'_rp_{parameters.width_cm * 10:g}_{parameters.ppi}ppi_{angle:g}G.png'
+    # Auch bei langen Unicode-Namen den vollständigen Parametersuffix erhalten.
+    budget = 255 - len(suffix.encode('utf-8'))
+    stem = stem.encode('utf-8')[:budget].decode('utf-8', errors='ignore')
+    return stem + suffix
 
 
 class MemoryRequest(Request):
@@ -91,8 +105,10 @@ def create_app():
             parameters = Parameters.from_dict(values, image.size)
             data = render_png(image, parameters)
             width, height = parameters.output_size()
-        filename = f'motiv_rasterpilot_{parameters.width_cm * 10:g}mm_{parameters.ppi}ppi.png'
+        filename = export_filename(request.files['image'].filename, parameters)
         response = send_file(data, mimetype='image/png', as_attachment=True, download_name=filename)
+        # ASCII-Header; der Browser übernimmt exakt denselben Unicode-Dateinamen.
+        response.headers['X-Download-Name'] = quote(filename, safe='')
         response.headers['X-Image-Width'] = str(width)
         response.headers['X-Image-Height'] = str(height)
         return response

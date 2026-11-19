@@ -1,5 +1,12 @@
 # Timeline
 
+## 0.2.5 – 19. November 2026
+
+- Exportnamen auf den ursprünglichen Dateinamen ohne Endung mit dem Suffix `_rp_<Druckbreite in mm>_<Auflösung>ppi_<Winkel>G.png` umgestellt. Auf Anwenderwunsch Unterstriche anstelle der unter Windows unzulässigen Sternchen verwendet.
+- Originalnamen mit Umlauten, Leerzeichen und mehreren Punkten erhalten; Pfadanteile entfernt, ungültige Zeichen ersetzt und lange Namen bei vollständigem Parametersuffix begrenzt. Negative Winkel bleiben erkennbar.
+- Dateinamen zentral auf dem Server erzeugt und für API und Browserdownload identisch bereitgestellt. Bedienungsanleitung, Architektur und Arbeitsanweisung nachgeführt.
+- 31 Python-Tests und neun JavaScript-Zustandstests erfolgreich, einschließlich Unicode-Namen, mehrerer Punkte, dezimaler Druckbreite, negativer Winkel, Pfadbereinigung, Längenbegrenzung und Übernahme des Servernamens im Download.
+
 ## 0.2.4 – 19. November 2026
 
 - Vorhandenes RasterPilot-Logo links in die Top-Leiste integriert und als statische Anwendungsdatei eingebunden.

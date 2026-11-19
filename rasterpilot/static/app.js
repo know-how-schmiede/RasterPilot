@@ -160,7 +160,7 @@ $('render').addEventListener('click', async () => {
     $('resultOption').disabled = false;
     $('view').value = 'result';
     $('download').href = resultUrl;
-    $('download').download = `motiv_rasterpilot_${Number((p.width_cm * 10).toFixed(3))}mm_${p.ppi}ppi.png`;
+    $('download').download = decodeURIComponent(response.headers.get('X-Download-Name'));
     $('download').hidden = false;
     $('renderState').textContent = `${response.headers.get('X-Image-Width')} × ${response.headers.get('X-Image-Height')} px · PNG bereit`;
     message('Raster berechnet. Vor dem Export die Punkte bei 100 % prüfen.');

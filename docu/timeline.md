@@ -1,5 +1,12 @@
 # Timeline
 
+## 0.8.1 – 21. November 2026
+
+- Anwender bestätigt die Live-Tonwertüberlagerung als gut funktionierend und ergänzt den Wunsch nach Blau für bereits transparente Bildbereiche.
+- Vollständig transparente Quellpixel (Alpha 0) werden bei aktiver Überlagerung blau (#3B82F6) mit 40 % Vorschau-Deckkraft dargestellt. Verborgene RGB-Werte werden ignoriert. Nur das separate Vorschauarray erhält dort Alpha 102; Originaldaten und PNG-Export bleiben transparent. Teiltransparenz folgt weiter den bisherigen Rot-/Gelbregeln.
+- Blaue Klasse in Legende, Bedienung, Architektur, README und Arbeitsanleitung ergänzt. Beim Ausschalten wird das ursprüngliche Alpha 0 wiederhergestellt; JSON-Version 4 und übrige Bedienung bleiben erhalten.
+- 37 JavaScript- und zwei Anwendungstests erfolgreich: vier Farbklassen, unveränderte Quelldaten, tonwertunabhängige blaue Markierung, Wiederherstellung beim Ausschalten sowie Auslieferung von Legende und Assets geprüft. Keine neue Browserprüfung; keine Änderungen an Installation, Betrieb oder Verarbeitungskern.
+
 ## 0.8.0 – 21. November 2026
 
 - Im Modus „Schwarz durch Shirt ersetzen“ den standardmäßig ausgeschalteten Schalter „Tonwertbereiche anzeigen“ ergänzt. Grün markiert geschlossene Flächen mit Originalfarbe und deckendem Quellalpha, Rot vollständig entfernte sichtbare Pixel und Gelb Rasterbereiche einschließlich Teiltransparenz. Bereits transparente Pixel bleiben unmarkiert. Die Markierung mischt feste Farben mit 40 % in die Originalpixel und erhält Alpha; eine Textlegende und der Originaldateiname erklären die Ansicht.

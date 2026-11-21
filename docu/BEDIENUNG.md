@@ -86,8 +86,9 @@ Im Modus **„Schwarz durch Shirt ersetzen“** gibt es unter „Ansicht“ den 
 - **Grün:** Die Fläche bleibt geschlossen und behält die Originalfarbe. Dafür muss der stärkste RGB-Kanal mindestens den Weißpunkt erreichen und das ursprüngliche Alpha vollständig deckend sein.
 - **Rot:** Die Fläche wird vollständig entfernt und durch das schwarze Shirt ersetzt. Der stärkste RGB-Kanal erreicht höchstens den Schwarzpunkt.
 - **Gelb:** Die Fläche wird gerastert. Dazu zählen die Zwischenstufen und bereits teiltransparente Bereiche, solange sie nicht vollständig entfernt werden.
+- **Blau:** Der Bereich war im Original bereits vollständig transparent. Seine unsichtbaren Farbwerte spielen für die Markierung keine Rolle.
 
-Bereits vollständig transparente Stellen bleiben unmarkiert. Die Farben werden mit 40 % Stärke eingeblendet; Motivdetails und das ursprüngliche Alpha bleiben erkennbar. Ändere Schwarz- oder Weißpunkt, um die Grenzen live zu verfolgen. Es entstehen weder neue Serveranfragen noch Warteschlangenaufträge. Ein bereits angenommener Auftrag läuft weiter und bleibt über die Auftragsliste erreichbar.
+Die Farben werden mit 40 % Stärke eingeblendet; Motivdetails bleiben erkennbar. Bereits transparente Stellen erhalten ausschließlich in der Vorschau eine halbtransparente blaue Markierung. Beim Ausschalten wird dort wieder das unveränderte transparente Original sichtbar. Quelldaten und PNG-Export bleiben transparent. Teiltransparente Motivbereiche folgen weiterhin den Rot-/Gelbregeln. Ändere Schwarz- oder Weißpunkt, um die Grenzen live zu verfolgen. Es entstehen weder neue Serveranfragen noch Warteschlangenaufträge. Ein bereits angenommener Auftrag läuft weiter und bleibt über die Auftragsliste erreichbar.
 
 Beim Ausschalten erscheint das unveränderte Original. Die Ergebnisansicht, einschließlich gespeicherter Ergebnisse aus der Auftragsliste, schaltet die Markierung aus. Ohne geladenes Original ist der Schalter deaktiviert; in anderen Rastermodi wird er ausgeblendet. Bei ungültigen Tonwerten verschwindet die Markierung, das Original bleibt sichtbar. Fehler in Druckgröße oder Auflösung verhindern die Flächenkontrolle mit gültigen Tonwerten nicht.
 

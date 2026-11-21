@@ -1,5 +1,9 @@
 # Architektur
 
+## 0.8.1: vorhandene Transparenz blau markieren
+
+Die vom Anwender bestätigte Live-Vorschau erhält eine vierte Klasse: Quellpixel mit Alpha 0 erscheinen blau (#3B82F6). Dafür bekommt ausschließlich das separate Vorschauarray an diesen Stellen Alpha 102 (40 %); verborgene RGB-Werte der Quelle werden nicht eingemischt. Beim Ausschalten wird das unveränderte Original einschließlich Alpha 0 wiederhergestellt. Vorgehen: blaue Klasse und Legende ergänzen, Quellschutz/Ein-Aus-Verhalten prüfen und Bedienung nachführen. Export, Verarbeitungskern und JSON-Format bleiben unverändert; Teiltransparenz folgt weiter den bisherigen Rot-/Gelbregeln.
+
 ## 0.8.0: Live-Tonwertüberlagerung
 
 Etappen: reine Bereichsklassifizierung im Browser ergänzen, unveränderte Importpixel zwischenspeichern, Canvas/Ansicht von der Druckparameterprüfung entkoppeln, Schalter und Legende integrieren, JSON-Version 4 mit Altimport einführen und Verhalten/Leistung prüfen. Die Rückmeldung des Anwenders bestätigt die Warteschlange einschließlich mehrerer Browser; Tests zwischen unterschiedlichen Rechnern stehen noch aus.

@@ -47,6 +47,7 @@ Bilder werden an den eigenen RasterPilot-Server übertragen, dort verarbeitet un
 - Farbige Motive gleichmäßig auflockern oder gezielt Übergänge zu Schwarz für schwarze Shirts rastern, einfarbige Halbtonmotive aus Helligkeitswerten erzeugen oder weiche Transparenz in Rasterpunkte umwandeln.
 - Rastergröße, Winkel, Deckung und bei Bedarf Tonwerte einstellen sowie das Ergebnis mit dem Original vergleichen.
 - Das Ergebnis mit Zoom, Transparenzraster und einer wählbaren Textilfarbe als Vorschau betrachten.
+- In der Live-Tonwertüberlagerung bereits vollständig transparente Bildbereiche blau erkennen; die Markierung bleibt eine reine Ansichtshilfe.
 - Ein transparentes PNG in der berechneten Druckgröße exportieren und Einstellungen als JSON speichern und wieder laden.
 - Bis zu zehn aktive/wartende Aufträge einreichen. Unter der Vorschau eigene Originaldateinamen, Status und Warteposition sehen; fertige Ergebnisse bis zum Ablauf auch nach Neuladen anzeigen und herunterladen. Die Gesamtauslastung wird anonym angezeigt, fremde Dateinamen bleiben verborgen.
 

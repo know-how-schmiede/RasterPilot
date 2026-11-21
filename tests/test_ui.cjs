@@ -492,8 +492,8 @@ test('Fertige Ergebnisse bleiben bei Einstellungswechseln gespeichert und nach N
 });
 
 test('Tonwertüberlagerung aktualisiert live ohne Netzwerk, erhält die Quelle und fasst Eingaben zusammen', async () => {
-  const pixels = [0, 0, 0, 255, 128, 128, 128, 255, 255, 255, 255, 255];
-  const ui = setup({ sourceWidth: 3, sourceHeight: 1, previewPixels: pixels });
+  const pixels = [0, 0, 0, 255, 128, 128, 128, 255, 255, 255, 255, 255, 200, 0, 0, 0];
+  const ui = setup({ sourceWidth: 4, sourceHeight: 1, previewPixels: pixels });
   await ui.importImage('Eichhörnchen.png');
   ui.c.mode.value = 'affinity'; ui.c.mode.fire('input'); ui.flushFrames();
   assert.equal(ui.c.tone_overlay.checked, false);
@@ -503,7 +503,7 @@ test('Tonwertüberlagerung aktualisiert live ohne Netzwerk, erhält die Quelle u
   assert.equal(ui.c.overlayLegend.hidden, false);
   assert.match(ui.c.overlayCaption.textContent, /Eichhörnchen.png/);
   ui.flushFrames();
-  assert.deepEqual(Array.from(ui.c.canvas.painted), [96, 27, 27, 255, 177, 158, 85, 255, 167, 232, 191, 255]);
+  assert.deepEqual(Array.from(ui.c.canvas.painted), [96, 27, 27, 255, 177, 158, 85, 255, 167, 232, 191, 255, 59, 130, 246, 102]);
   ui.c.white.value = '128'; ui.c.white.fire('input');
   ui.c.white.value = '180'; ui.c.white.fire('input');
   ui.c.white.value = '200'; ui.c.white.fire('input');

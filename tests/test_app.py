@@ -21,6 +21,7 @@ class AppTest(unittest.TestCase):
         self.assertLess(html.index('id="stage"'), html.index('id="jobsTable"'))
         self.assertIn('id="tone_overlay"', html)
         self.assertIn('Legende der Tonwertbereiche', html)
+        self.assertIn('Blau: bereits transparent', html)
         for path in ('/static/app.js', '/static/settings.js', '/static/jobs.js', '/static/tone-overlay.js',
                      '/static/style.css', '/static/rasterpilot-logo.svg'):
             response = self.client.get(path)

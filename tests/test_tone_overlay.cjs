@@ -6,7 +6,7 @@ const context = vm.createContext({});
 vm.runInContext(readFileSync('rasterpilot/static/tone-overlay.js', 'utf8'), context);
 const overlay = context.RasterPilotToneOverlay;
 
-test('Grenzen, kräftige Farben und Alpha ordnen Grün, Rot und Gelb zu', () => {
+test('Grenzen, kräftige Farben und Alpha ordnen Grün, Rot, Gelb und Blau zu', () => {
   const source = new Uint8ClampedArray([
     20, 20, 20, 255, // Schwarzpunkt -> Rot
     100, 100, 100, 255, // Zwischenstufe -> Gelb
@@ -14,17 +14,18 @@ test('Grenzen, kräftige Farben und Alpha ordnen Grün, Rot und Gelb zu', () => 
     0, 0, 255, 255, // Kräftiges Blau -> Grün
     255, 255, 255, 128, // Teiltransparenz -> Gelb
     20, 20, 20, 128, // Entfernt trotz Teiltransparenz -> Rot
-    255, 0, 0, 0 // Volltransparenz bleibt unverändert
+    255, 0, 0, 0 // Volltransparenz wird nur in der Ansicht blau markiert
   ]);
   const original = source.slice(), output = new Uint8ClampedArray(source.length);
   const cache = overlay.prepare(source);
   assert.equal(overlay.tint(cache, output, 20, 200), true);
   assert.deepEqual(Array.from(output), [
     108, 39, 39, 255, 160, 142, 68, 255, 134, 199, 158, 255,
-    14, 79, 191, 255, 253, 235, 161, 128, 108, 39, 39, 128, 255, 0, 0, 0
+    14, 79, 191, 255, 253, 235, 161, 128, 108, 39, 39, 128, 59, 130, 246, 102
   ]);
   assert.deepEqual(source, original);
   overlay.tint(cache, output, 110, 230);
+  assert.deepEqual(Array.from(output.slice(-4)), [59, 130, 246, 102]);
   assert.deepEqual(source, original);
 });
 

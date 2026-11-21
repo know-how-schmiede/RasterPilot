@@ -2,8 +2,14 @@
 const $ = id => document.getElementById(id);
 const fields = ['width', 'ppi', 'spacing', 'coverage', 'angle'];
 const toneFields = ['black', 'white', 'gamma'];
-const affinityDefaults = Object.freeze({ gamma: 1, mask_contrast: 85, levels_blend: 'vivid_light',
-  bw_red: 100, bw_yellow: 100, bw_green: 100, bw_cyan: 100, bw_blue: 100, bw_magenta: 100 });
+const affinityDefaults = RasterPilotSettings.affinityDefaults;
+const modeTones = { luminance: { black: '0', white: '255' }, affinity: { black: '0', white: '245' } };
+let toneMode = 'color';
+let hasBlackPreview = false;
+
+function rememberTones() {
+  if (modeTones[toneMode]) modeTones[toneMode] = { black: $('black').value, white: $('white').value };
+}
 let image = null;
 let originalFile = null;
 let sourceWidth = 0;
@@ -94,11 +100,12 @@ function updateMode() {
   for (const id of ['invert', 'black', 'white', 'resetTones']) $(id).disabled = !(luminance || affinity);
   $('gammaControl').hidden = !luminance;
   $('gamma').disabled = !luminance;
+  $('invertControl').hidden = !luminance;
+  $('invert').disabled = !luminance;
   $('affinityControls').hidden = !affinity;
-  $('affinityPreset').disabled = !affinity;
   $('modeInfo').textContent = mode === 'color' ?
     'Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken.' : affinity ?
-    'Wie im Affinity-Handout: Eine Helligkeitsmaske rastert die Originalfarben. Helle Bereiche erzeugen mehr Druckfläche, dunkle werden transparent. Schwarz- und Weißpunkt beeinflussen nur die Maske.' : luminance ?
+    'Schwarz übernimmt das Shirt. Weiße und kräftige Farbflächen bleiben geschlossen; Übergänge zu Schwarz werden mit aufgehellten Punkten gerastert. Für schwarze Textilien.' : luminance ?
     'Dunkle Bildstellen erzeugen mehr Druckfläche in der gewählten Druckfarbe. Vorhandene Transparenz bleibt berücksichtigt.' :
     'Weiche Transparenz wird in deckende Punkte umgewandelt. Vollständig deckende Bereiche und die Bildfarben bleiben erhalten; ohne Transparenz entstehen keine Lücken.';
 }
@@ -305,47 +312,47 @@ $('loadSettings').addEventListener('change', async event => {
   if (!file) return;
   try {
     if (file.size > 64 * 1024) throw new Error('Einstellungsdateien dürfen höchstens 64 KiB groß sein.');
-    const data = RasterPilotSettings.parse(await file.text());
+    const source = JSON.parse(await file.text());
+    const data = RasterPilotSettings.validate(source);
     if (current !== presetSequence) return;
+    rememberTones();
     for (const [key, id] of Object.entries(presetFields)) {
-      if (key === 'gamma' && data.settings.mode === 'affinity') continue;
+      if (['gamma', 'invert'].includes(key) && data.settings.mode === 'affinity') continue;
       if (key === 'invert') $(id).checked = data.settings[key];
       else $(id).value = String(data.settings[key]);
     }
     for (const [id, value] of Object.entries(data.view)) $(id).value = value;
+    toneMode = data.settings.mode;
+    if (!modeTones[toneMode]) modeTones.luminance = { black: $('black').value, white: $('white').value };
+    rememberTones();
+    if (toneMode === 'affinity') hasBlackPreview = true;
     updateMode(); invalidate(); renderOriginal();
     message(image ? ($('render').disabled ? `Einstellungen geladen. ${$('message').textContent}` :
       'Einstellungen geladen. Raster bitte neu berechnen.') : 'Einstellungen geladen. Bitte ein Bild auswählen.');
-    if (data.settings.mode === 'affinity' && Object.entries(affinityDefaults).some(([key, value]) => data.settings[key] !== value)) {
-      message(`${$('message').textContent} Zusätzliche Maskenwerte wurden auf die festen Vorgaben gesetzt.`);
+    if (data.settings.mode === 'affinity' && source.version < 3) {
+      message(`${$('message').textContent} Der frühere Affinity-Modus wurde durch „Schwarz durch Shirt ersetzen“ abgelöst. Die neue Berechnung hellt die Rasterpunkte auf; frühere Zusatzparameter und Umkehrung entfallen.`);
     }
   } catch (error) { if (current === presetSequence) message(`Einstellungen nicht geladen: ${error.message}`); }
   finally { if (current === presetSequence) event.target.value = ''; }
 });
 
 for (const id of fields) $(id).addEventListener('input', () => { invalidate(); renderOriginal(); });
-for (const id of ['mode', 'ink', 'invert', ...toneFields]) $(id).addEventListener('input', () => {
+for (const id of ['ink', 'invert', ...toneFields]) $(id).addEventListener('input', () => {
   updateMode(); invalidate(); renderOriginal();
 });
-$('affinityPreset').addEventListener('click', () => {
-  const width = Number($('width').value), ppi = Number($('ppi').value);
-  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(ppi) || ppi < 36 || ppi > 1200) {
-    message('Bitte zuerst eine gültige Druckbreite und Auflösung eingeben.'); return;
+$('mode').addEventListener('input', () => {
+  rememberTones();
+  toneMode = $('mode').value;
+  const tones = modeTones[toneMode] || modeTones.luminance;
+  $('black').value = tones.black;
+  $('white').value = tones.white;
+  if (toneMode === 'affinity' && !hasBlackPreview) {
+    $('background').value = 'textile'; $('color').value = '#000000'; hasBlackPreview = true;
   }
-  // 10 Referenzpixel / 1904 Bildpixel, auf die Druckbreite übertragen.
-  const requested = width * 10 * 10 / 1904;
-  const spacing = Math.max(0.1, Math.round(requested * 1000) / 1000,
-    Math.ceil(50.8 / ppi * 1000) / 1000);
-  if (spacing > 10) {
-    message('Das Handout-Beispiel ergibt mehr als 10 mm Rasterabstand. Bitte die Druckbreite verringern.'); return;
-  }
-  $('mode').value = 'affinity'; $('angle').value = '45'; $('spacing').value = String(spacing);
-  $('black').value = '0'; $('white').value = '184'; $('invert').checked = false;
   updateMode(); invalidate(); renderOriginal();
-  if (!$('render').disabled) message(`Handout-Beispiel übernommen: Weißpunkt 184 ≈ 72 %, Rasterabstand ${spacing.toFixed(3)} mm. Raster neu berechnen und bei 100 % prüfen.${spacing > requested + 0.001 ? ' Der Abstand wurde auf die Mindestgröße von zwei Exportpixeln angehoben.' : ''}`);
 });
 $('resetTones').addEventListener('click', () => {
-  $('black').value = '0'; $('white').value = '255';
+  $('black').value = '0'; $('white').value = $('mode').value === 'affinity' ? '245' : '255';
   if ($('mode').value === 'luminance') $('gamma').value = '1';
   invalidate(); renderOriginal();
 });

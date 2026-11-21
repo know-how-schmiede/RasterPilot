@@ -1,5 +1,15 @@
 # Timeline
 
+## 0.6.0 – 21. November 2026
+
+- Den bisherigen Affinity-Modus auf Anwenderwunsch durch „Schwarz durch Shirt ersetzen“ abgelöst; API-Wert `affinity` bleibt erhalten. Schwarz wird transparent, helle und kräftige Farbflächen bleiben geschlossen. Auch farbige Übergänge zu Schwarz werden gerastert.
+- Deckung aus dem stärksten RGB-Kanal zwischen Schwarz-/Weißpunkt berechnet, Vorgabe und Reset 0/245. Punktfarben werden durch die Farbdeckung geteilt und auf den Kanalbereich begrenzt, damit das Bild auf Schwarz durch die Rasterlücken nicht zusätzlich abdunkelt. Vollständig geschlossene Farbflächen behalten die Originalwerte; Alpha wird einmal berücksichtigt. Eine Rundungstoleranz an halben Kanalwerten verhindert numerisch bedingte Abweichungen um einen Kanalwert.
+- Handout-Beispielschaltfläche und Umkehrung in diesem Modus entfernt. Frühere Zusatzparameter beeinflussen die neue Berechnung nicht. Nur Schwarz-/Weißpunkt als Tonwertregler; eigene Tonwerte je Modus und Gamma/Umkehrung des einfarbigen Modus bleiben beim Wechsel erhalten. Die erste manuelle Auswahl stellt die Vorschau auf Schwarz; gespeicherte Ansichten bleiben beim Laden erhalten.
+- JSON-Formatversion 3 eingeführt. Vollständige Versionen 1/2 bleiben importierbar; alte Affinity-Dateien erhalten einen Hinweis auf die veränderte Berechnung. Schwarz-/Weißpunkt, Rastergeometrie und Ansicht werden übernommen. Die drei anderen Rastermodi behalten ihre Berechnung und alten Einstellungen. Dokumentation und Benchmark-Hilfe nachgeführt; keine neuen Abhängigkeiten oder Änderungen an Installation/Updates.
+- 56 Python-Tests und 26 JavaScript-Tests erfolgreich. Geprüft sind geschlossene Weiß-/Farbflächen, Grau-/Farbverläufe, gemittelte Rekonstruktion auf Schwarz innerhalb von drei Kanalwerten, aufgehellte Punktfarben, Alpha, Tonwertgrenzen, Rasterwinkel, saubere skalierte Kanten, Queue/Worker, JSON-Migration und Moduswechsel.
+- Vorhandenes Eichhörnchen-Motiv mit 28 cm/300 ppi, 1 mm Abstand und 45° verarbeitet: Ausgabe 3307 × 4419 Pixel, 299,9994 ppi, binäres Alpha, rund 2,55 s einschließlich PNG-Dekodierung. 1.982.862 voll deckende Quellpixel ab Weißpunkt 245 bleiben exakt erhalten, schwarze Quellpixel transparent. Gesamtbild auf Schwarz und Exportausschnitt bei 100 % direkt visuell geprüft. Visuelle Browserprüfung und physische Druckabnahme bleiben offen.
+- Synthetischer Standardbenchmark mit `--mode affinity`: unter Windows 11/Python 3.12.15 bei 2400 × 2400 Eingabe und 3307 × 3307 Ausgabe etwa 2,35 s und 189,7 MiB Prozessspeicherspitze. Parallel zu Softwaretests gemessen; keine LXC-Lastmessung oder Druckkalibrierung.
+
 ## 0.5.1 – 21. November 2026
 
 - Auf Anwenderwunsch die Tonwertregler im Affinity-Modus auf Schwarz- und Weißpunkt beschränkt. Sechs Farbregler, Maskenkontrast und Mischmodusauswahl entfernt; Gamma ist ausschließlich im bisherigen einfarbigen Modus einstellbar.

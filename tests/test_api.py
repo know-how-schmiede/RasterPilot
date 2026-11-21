@@ -156,10 +156,10 @@ class ImageApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 413)
         self.assertIn('error', response.json)
 
-    def test_affinity_settings_survive_queue_and_worker_with_original_colors(self):
+    def test_black_shirt_survives_queue_and_worker_with_lighter_dot_colors(self):
         data = self.data(mode='affinity', mask_contrast=0, levels_blend='vivid_light',
-                         bw_red=140, bw_blue=80, white_point=184, angle_deg=45)
-        with Image.new('RGBA', (256, 128), (160, 180, 200, 128)) as source:
+                         bw_red=140, bw_blue=80, white_point=245, angle_deg=45)
+        with Image.new('RGBA', (256, 128), (128, 64, 32, 128)) as source:
             source.paste((255, 255, 255, 0), (0, 0, 128, 128))
             data['image'] = (encoded(source, format='PNG'), 'farben.png')
         response = self.render(data=data)
@@ -172,7 +172,8 @@ class ImageApiTest(unittest.TestCase):
             visible = array[:, 128:, 3] == 255
             self.assertGreater(visible.mean(), 0)
             self.assertLess(visible.mean(), 1)
-            self.assertTrue(np.all(array[:, 128:][visible, :3] == [160, 180, 200]))
+            self.assertAlmostEqual(visible.mean(), 128 / 245 * 128 / 255, delta=0.02)
+            self.assertTrue(np.all(array[:, 128:][visible, :3] == [245, 123, 61]))
             self.assertLessEqual(set(np.unique(array[:, :, 3])), {0, 255})
         response.close()
 

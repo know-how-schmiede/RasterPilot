@@ -106,7 +106,8 @@ class Parameters:
         if not isinstance(values, dict):
             raise ImageError('Die Rastereinstellungen müssen ein JSON-Objekt sein.')
         values = dict(angle_deg=0, mode='color', ink_color='#000000', invert=False,
-                      black_point=0, white_point=255, gamma=1, mask_contrast=85,
+                      black_point=0, white_point=245 if values.get('mode') == 'affinity' else 255,
+                      gamma=1, mask_contrast=85,
                       levels_blend='normal', **{f'bw_{c}': 100 for c in
                       ('red', 'yellow', 'green', 'cyan', 'blue', 'magenta')}) | values
         if values['mode'] not in ('color', 'luminance', 'alpha', 'affinity'):
@@ -192,60 +193,17 @@ def _area_rank(distance_squared):
     return np.clip(area, 0, 1)
 
 
-def _affinity_threshold(p):
-    """Lichterschwelle nach Tonwerten/Mischmodus des gerasterten Signals.
-
-    Das Handout stimmt die Tonwerte nach dem Zusammenlegen des Filters ab.
-    Beide Transformationen sind monoton; eine skalare Schwelle genügt daher.
-    """
-    def corrected(value):
-        level = np.clip((value * 255 - p.black_point) /
-                        (p.white_point - p.black_point), 0, 1) ** (1 / p.gamma)
-        if p.levels_blend == 'normal':
-            return level
-        if level < 0.5:
-            return np.clip(1 - (1 - value) / max(2 * level, 1e-12), 0, 1)
-        return np.clip(value / max(2 * (1 - level), 1e-12), 0, 1)
-
-    low, high = 0., 1.
-    for _ in range(48):
-        middle = (low + high) / 2
-        if corrected(middle) < 0.5:
-            low = middle
-        else:
-            high = middle
-    return (low + high) / 2
-
-
-def _affinity_tone(pixels, parameters, threshold):
-    """Arbeitskopie für die Maske; die RGB-Farbquelle bleibt unverändert.
-
-    Dokumentierte Annäherung an den Handout-Ablauf, kein Affinity-Filterklon.
-    """
-    adjusted = pixels[:, :, :3].astype(np.float64) / 255
-    p = parameters
-    red, green, blue = np.moveaxis(adjusted, -1, 0)
-    maximum, minimum = adjusted.max(axis=2), adjusted.min(axis=2)
-    delta = maximum - minimum
-    safe_delta = np.where(delta > 0, delta, 1)
-    hue = np.where(maximum == red, ((green - blue) / safe_delta) % 6,
-                   np.where(maximum == green, (blue - red) / safe_delta + 2,
-                            (red - green) / safe_delta + 4))
-    sector = np.floor(hue).astype(np.intp) % 6
-    fraction = hue - np.floor(hue)
-    gains = np.array([p.bw_red, p.bw_yellow, p.bw_green, p.bw_cyan,
-                      p.bw_blue, p.bw_magenta], dtype=np.float64) / 100
-    gain = gains[sector] * (1 - fraction) + gains[(sector + 1) % 6] * fraction
-    saturation = delta / np.maximum(maximum, 1e-12)
-    brightness = (2126 * red + 7152 * green + 722 * blue) / 10000
-    tone = np.clip(brightness * (1 + saturation * (gain - 1)), 0, 1)
-    # Arbeitsraster H = clip(0,5 + (T - Flächenrang) * Faktor, 0, 1).
-    # Tonwerte/Mischmodus und anschließende Lichterauswahl H > threshold
-    # lassen sich als effektive Deckung ausdrücken. Kontrast schärft so das
-    # Raster statt den Motivtonwert hart abzuschneiden. Endtöne exakt halten.
-    desired = np.clip(tone + (0.5 - threshold) / (1 + p.mask_contrast / 10), 0, 1)
-    desired = np.where(tone <= 0, 0, np.where(tone >= 1, 1, desired))
-    return 1 - desired if p.invert else desired
+def _black_shirt_coverage(pixels, parameters):
+    """Schwarz durch Textil ersetzen und die Punktfarben aufhellen."""
+    rgb = pixels[:, :, :3].astype(np.float64)
+    coverage = np.clip((rgb.max(axis=2) - parameters.black_point) /
+                       (parameters.white_point - parameters.black_point), 0, 1)
+    # Nur durch Farbdeckung teilen, niemals durch das ursprüngliche Alpha.
+    colors = np.divide(rgb, coverage[:, :, None], out=np.zeros_like(rgb),
+                       where=coverage[:, :, None] > 0)
+    # Numerische Abweichungen an exakten halben Kanalwerten ausgleichen.
+    pixels[:, :, :3] = np.floor(np.clip(colors, 0, 255) + 0.5 + 1e-9).astype(np.uint8)
+    return coverage
 
 
 def render_png(image, parameters):
@@ -257,7 +215,6 @@ def render_png(image, parameters):
     # Pixelmitten in Rasterkoordinaten abbilden. Positive Winkel drehen das
     # Raster im Uhrzeigersinn um die linke obere Bildkante, ohne das Bild zu drehen.
     xx = (np.arange(size[0], dtype=np.float64) + 0.5) / pitch
-    affinity_threshold = _affinity_threshold(parameters) if parameters.mode == 'affinity' else None
     for start in range(0, size[1], 128):
         end = min(start + 128, size[1])
         yy = (np.arange(start, end, dtype=np.float64) + 0.5) / pitch
@@ -271,7 +228,7 @@ def render_png(image, parameters):
         if parameters.mode == 'color':
             desired *= parameters.coverage / 100
         elif parameters.mode == 'affinity':
-            desired *= _affinity_tone(pixels, parameters, affinity_threshold)
+            desired *= _black_shirt_coverage(pixels, parameters)
         elif parameters.mode == 'luminance':
             rgb = pixels[:, :, :3].astype(np.float64)
             # Gewichtete sRGB-Helligkeit; Schwarz und Weiß bleiben exakt 0/255.

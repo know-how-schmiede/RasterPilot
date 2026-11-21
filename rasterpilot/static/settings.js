@@ -6,6 +6,8 @@ globalThis.RasterPilotSettings = (() => {
     black_point: 0, white_point: 255, gamma: 1, mask_contrast: 85, levels_blend: 'normal',
     bw_red: 100, bw_yellow: 100, bw_green: 100, bw_cyan: 100, bw_blue: 100, bw_magenta: 100 });
   const affinityKeys = ['mask_contrast', 'levels_blend', 'bw_red', 'bw_yellow', 'bw_green', 'bw_cyan', 'bw_blue', 'bw_magenta'];
+  const affinityDefaults = Object.freeze({ gamma: 1, invert: false, mask_contrast: 85, levels_blend: 'normal',
+    bw_red: 100, bw_yellow: 100, bw_green: 100, bw_cyan: 100, bw_blue: 100, bw_magenta: 100 });
   const viewDefaults = Object.freeze({ background: 'textile', color: '#233246', zoom: 'fit' });
   const ranges = { width_cm: [0.1, 200], ppi: [36, 1200], spacing_mm: [0.1, 10],
     coverage: [0, 100], angle_deg: [-180, 180], black_point: [0, 254], white_point: [1, 255], gamma: [0.1, 5],
@@ -14,8 +16,8 @@ globalThis.RasterPilotSettings = (() => {
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const color = value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
   function validate(data) {
-    if (!object(data) || data.format !== 'RasterPilot' || ![1, 2].includes(data.version) ||
-        !object(data.settings) || !object(data.view)) throw new Error('Keine unterstützte RasterPilot-Einstellungsdatei (Version 1 oder 2).');
+    if (!object(data) || data.format !== 'RasterPilot' || ![1, 2, 3].includes(data.version) ||
+        !object(data.settings) || !object(data.view)) throw new Error('Keine unterstützte RasterPilot-Einstellungsdatei (Version 1, 2 oder 3).');
     if (data.version === 1) {
       const oldKeys = Object.keys(defaults).filter(key => !affinityKeys.includes(key));
       if (Object.keys(data.settings).length !== oldKeys.length ||
@@ -49,11 +51,12 @@ globalThis.RasterPilotSettings = (() => {
       throw new Error('Ungültige Raster- oder Ansichtseinstellungen. Bitte Werte und Tonwertgrenzen prüfen.');
     }
     // Nur bekannte Schlüssel kopieren; keine Dateipfade oder Inhalte übernehmen.
-    return { format: 'RasterPilot', version: 2,
-      settings: Object.fromEntries(Object.keys(defaults).map(key => [key, p[key]])),
+    return { format: 'RasterPilot', version: 3,
+      settings: { ...Object.fromEntries(Object.keys(defaults).map(key => [key, p[key]])),
+        ...(p.mode === 'affinity' ? affinityDefaults : {}) },
       view: Object.fromEntries(Object.keys(viewDefaults).map(key => [key, v[key]])) };
   }
-  return Object.freeze({ defaults, viewDefaults, validate,
+  return Object.freeze({ defaults, affinityDefaults, viewDefaults, validate,
     parse: text => validate(JSON.parse(text)),
-    serialize: (settings, view) => JSON.stringify(validate({ format: 'RasterPilot', version: 2, settings, view }), null, 2) });
+    serialize: (settings, view) => JSON.stringify(validate({ format: 'RasterPilot', version: 3, settings, view }), null, 2) });
 })();

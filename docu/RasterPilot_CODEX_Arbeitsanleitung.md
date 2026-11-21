@@ -87,7 +87,7 @@ Diese Arbeitsanweisung unter `docu/RasterPilot_CODEX_Arbeitsanleitung.md` führe
 - Immer das vollständige Motiv verarbeiten und ausgeben; Zuschnitt auf Anwenderwunsch vorerst entfernt. Seitenverhältnis bei Größenänderung erhalten.
 - Druckbreite in Zentimetern und Ausgabeauflösung festlegen, berechnete Höhe und Pixelmaße anzeigen.
 - Farbiges Motiv gleichmäßig durch transparente Rasterlücken auflockern.
-- Zusätzlich den Affinity-Handout-Ablauf als farbiges Helligkeitsraster anbieten: Eine Schwarz-Weiß-Arbeitskopie erzeugt eine runde Rastermaske für die unveränderten Originalfarben. Auf Anwenderwunsch ausschließlich Schwarz- und Weißpunkt als Tonwertregler anbieten. Gamma 1, Kontrast 85, neutrale Farbwerte und Strahlendes Licht fest vorgeben; Maskenrichtung und Rastergeometrie bleiben einstellbar. Beispielwerte als motivabhängige Vorgabe und Berechnungsunterschiede dokumentieren.
+- Auf Anwenderwunsch den früheren Affinity-Modus durch „Schwarz durch Shirt ersetzen“ ablösen: Schwarz transparent, helle und kräftige Farbflächen geschlossen, nur Übergänge zu Schwarz gerastert. Der stärkste RGB-Kanal bestimmt die Deckung; Punktfarben zur Helligkeitserhaltung auf Schwarz durch die Farbdeckung teilen und auf 255 begrenzen. Originalalpha genau einmal anwenden. Nur Schwarz-/Weißpunkt als Tonwerte anbieten (Vorgabe 0/245), keine Umkehrung. Rastergeometrie bleibt einstellbar; physische Druckkalibrierung bleibt separat.
 - Klassisches einfarbiges, helligkeitsgesteuertes Halbtonmotiv erzeugen; Druckfarbe und Umkehrung anbieten.
 - Bereits vorhandene weiche Transparenz in Rasterpunkte umsetzen, während vollständig deckende Innenbereiche erhalten bleiben können.
 - Rastergröße, Flächendeckung und optionale Tonwertkorrektur einstellen.
@@ -117,7 +117,7 @@ Rasterabstände und Mindestgrößen in Millimetern führen. Zentimeter, Millimet
 
 Leichte Entrauschung und danach Tonwertkorrektur vor der Rasterung vorsehen. Standardmäßig keine aggressive Korrektur. Automatische Tonwerte dürfen ausschließlich den sichtbaren Motivbereich auswerten. Schwarzpunkt, Weißpunkt und Gamma separat anbieten; Schwarzpunkt muss kleiner als Weißpunkt sein, Gamma muss positiv sein.
 
-Keine globale harte Schwarz-Weiß-Schwelle als Ersatz für die Halbtonberechnung verwenden. Farbkorrektur und Anpassung der Deckungsmaske als getrennte Optionen behandeln, damit ein Deckungsregler nicht unbeabsichtigt die Motivfarben verändert.
+Keine globale harte Schwarz-Weiß-Schwelle als Ersatz für die Halbtonberechnung verwenden. Farbkorrektur und Anpassung der Deckungsmaske als getrennte Optionen behandeln, damit ein Deckungsregler nicht unbeabsichtigt die Motivfarben verändert. Im ausdrücklich dafür gewählten Modus „Schwarz durch Shirt ersetzen“ werden die Punktfarben gezielt anhand der Farbdeckung aufgehellt; geschlossene Flächen behalten ihre Originalfarben.
 
 ### 5.4 Deckungsmaske berechnen
 
@@ -126,7 +126,7 @@ Deckungswert `c` intern auf 0 bis 1 normieren. Bestehende vollständige Transpar
 | Modus | Grundlage der Deckung | Erwartetes Verhalten |
 | --- | --- | --- |
 | Farbig auflockern | Einstellbare Deckung innerhalb des vorhandenen Motivs | Bildfarben bleiben erhalten; Weiß ist Motivfarbe und wird nicht automatisch entfernt |
-| Farbig nach Helligkeit · Affinity | Schwarz-Weiß-Arbeitskopie mit einstellbarem Schwarz-/Weißpunkt und festen übrigen Maskenwerten | Standardmäßig Lichter als sichtbare Originalfarben, optional invertiert; nur Maske verändern, Annäherung an Handout dokumentieren |
+| Schwarz durch Shirt ersetzen | Stärkster RGB-Kanal, normiert zwischen Schwarz-/Weißpunkt | Helle und kräftige Flächen geschlossen, Schwarz transparent, Übergänge mit aufgehellten Punkten; API-Wert `affinity` bleibt aus Kompatibilitätsgründen erhalten |
 | Einfarbig nach Helligkeit | Tonwertkorrigierte Helligkeit, optional invertiert | Dunkle beziehungsweise bei Umkehr helle Bereiche erzeugen mehr Druckfläche |
 | Transparenz rastern | Vorhandener Alphakanal | Weiche transparente Übergänge werden durch deckende Punkte und transparente Lücken ersetzt |
 

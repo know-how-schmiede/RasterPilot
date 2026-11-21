@@ -28,7 +28,7 @@
       <p class="hint">Das vollständige Bild wird mit unverändertem Seitenverhältnis verarbeitet. Bildauflösung, keine Druckerauflösung. Export: maximal 40 Megapixel und 12000 Pixel je Kante.</p>
       <p id="dimensions" class="dimensions"></p>
       <h2>Raster</h2>
-      <label>Rastermodus <select id="mode"><option value="color">Farbig auflockern</option><option value="affinity">Farbig nach Helligkeit · Affinity</option><option value="luminance">Einfarbig nach Helligkeit</option><option value="alpha">Transparenz rastern</option></select></label>
+      <label>Rastermodus <select id="mode"><option value="color">Farbig auflockern</option><option value="affinity">Schwarz durch Shirt ersetzen</option><option value="luminance">Einfarbig nach Helligkeit</option><option value="alpha">Transparenz rastern</option></select></label>
       <p id="modeInfo" class="hint">Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken.</p>
       <label>Rasterabstand in mm <input id="spacing" type="number" min="0.1" max="10" step="0.001" value="1"></label>
       <label>Rasterwinkel in ° <input id="angle" type="number" min="-180" max="180" step="1" value="0"></label>
@@ -39,20 +39,18 @@
       </div>
       <div id="luminanceControls" hidden>
         <label id="inkControl">Druckfarbe <input id="ink" type="color" value="#000000" disabled></label>
-        <label class="check"><input id="invert" type="checkbox" disabled> Helligkeit umkehren</label>
+        <label id="invertControl" class="check"><input id="invert" type="checkbox" disabled> Helligkeit umkehren</label>
         <details class="advanced"><summary>Erweitert · Tonwerte</summary>
           <label>Schwarzpunkt <input id="black" type="number" min="0" max="254" step="1" value="0" disabled></label>
           <label>Weißpunkt <input id="white" type="number" min="1" max="255" step="1" value="255" disabled></label>
           <label id="gammaControl">Gamma <input id="gamma" type="number" min="0.1" max="5" step="0.1" value="1" disabled></label>
-          <p class="hint">Schwarz- und Weißpunkt steuern ausschließlich die Helligkeitsmaske. Schwarzpunkt muss kleiner als Weißpunkt sein.</p>
+          <p class="hint">Schwarzpunkt muss kleiner als Weißpunkt sein. Beim Ersetzen von Schwarz bestimmt der stärkste Farbkanal die Deckung: bis zum Schwarzpunkt transparent, ab dem Weißpunkt geschlossen.</p>
           <button id="resetTones" type="button" disabled>Tonwerte zurücksetzen</button>
         </details>
       </div>
       <div id="affinityControls" hidden>
-        <button id="affinityPreset" type="button" disabled>Handout-Beispiel übernehmen</button>
-        <p class="hint">Schwarz-Weiß → rundes Halbtonraster → Tonwerte abstimmen → Lichter als Maske auf Originalfarben. Helle Stellen bleiben sichtbar. Bei umgekehrter Wirkung „Helligkeit umkehren“ wählen.</p>
-        <p class="hint">Unter „Erweitert · Tonwerte“ Schwarz- und Weißpunkt abstimmen. Die übrigen Maskenwerte sind fest vorgegeben. Eigene Annäherung, keine pixelgleiche Affinity-Ausgabe.</p>
-        <p id="affinityPresetInfo" class="hint">Beispiel: Weißstufe 72 %, Strahlendes Licht, Kontrast 85, 45°. Zellengröße 10 bei 1904 Pixel Bildbreite wird auf die aktuelle Druckbreite umgerechnet; der Abstand bleibt danach in mm eingestellt.</p>
+        <p class="hint">Grau entsteht aus helleren Punkten und schwarzem Shirt, Dunkelrot aus roten Punkten und Shirt. So werden die Übergänge durch das Raster nicht nochmals abgedunkelt. Geschlossene Flächen behalten ihre Originalfarben.</p>
+        <p class="hint">Vorgabe: Schwarzpunkt 0, Weißpunkt 245. Die Berechnung gilt für schwarze Shirts; andere Vorschaufarben verändern die Druckdatei nicht.</p>
       </div>
       <button type="button" id="render" class="primary">Raster berechnen</button>
       <button type="button" id="cancel" hidden>Berechnung abbrechen</button>

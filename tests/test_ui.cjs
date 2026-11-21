@@ -20,7 +20,7 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
     'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
     'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones', 'cancel',
-    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'gammaControl', 'affinityControls', 'affinityPreset'];
+    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'gammaControl', 'invertControl', 'affinityControls'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
@@ -345,7 +345,7 @@ test('Fehlender Worker und fehlgeschlagene Aufträge geben keinen Download frei'
   }
 });
 
-test('Affinity-Modus maskiert Originalfarben und übernimmt das skalierte Handout-Beispiel', async () => {
+test('Schwarz-Shirt-Modus bietet nur zwei Tonwerte und Vorschau auf Schwarz', async () => {
   const { c, importImage, submitted } = setup({ sourceWidth: 1904, sourceHeight: 2544 });
   await importImage();
   c.mode.value = 'affinity'; c.mode.fire('input');
@@ -355,76 +355,103 @@ test('Affinity-Modus maskiert Originalfarben und übernimmt das skalierte Handou
   assert.equal(c.coverage.disabled, true);
   assert.equal(c.white.disabled, false);
   assert.equal(c.gammaControl.hidden, true);
-  assert.equal(c.gamma.disabled, true);
-  c.affinityPreset.fire('click');
-  assert.equal(c.white.value, '184');
-  assert.equal(c.spacing.value, '1.471');
-  assert.equal(c.angle.value, '45');
-  assert.equal(c.invert.checked, false);
-  assert.match(c.message.textContent, /72 %/);
+  assert.equal(c.invertControl.hidden, true);
+  assert.equal(c.invert.disabled, true);
+  assert.equal(c.white.value, '245');
+  assert.equal(c.color.value, '#000000');
   await c.render.fire('click');
-  assert.equal(submitted().mode, 'affinity');
-  assert.equal(submitted().white_point, 184);
-  assert.equal(submitted().bw_red, 100);
-  assert.equal(submitted().levels_blend, 'vivid_light');
-  assert.equal(submitted().ink_color, undefined);
+  assert.equal(submitted().white_point, 245);
+  assert.equal(submitted().invert, false);
   assert.equal(c.download.hidden, false);
   c.white.value = '200'; c.white.fire('input');
   assert.equal(c.download.hidden, true);
   await c.render.fire('click');
   assert.equal(submitted().white_point, 200);
+  c.color.value = '#00ff00'; c.color.fire('input');
+  assert.equal(c.download.hidden, false);
   c.mode.value = 'color'; c.mode.fire('input');
   assert.equal(c.affinityControls.hidden, true);
   const html = readFileSync('rasterpilot/templates/index.html', 'utf8');
-  assert.doesNotMatch(html, /id="(?:bwRed|bwYellow|bwGreen|bwCyan|bwBlue|bwMagenta|maskContrast|levelsBlend)"/);
+  assert.doesNotMatch(html, /id="(?:affinityPreset|bwRed|bwYellow|bwGreen|bwCyan|bwBlue|bwMagenta|maskContrast|levelsBlend)"/);
+  assert.match(html, /Schwarz durch Shirt ersetzen/);
 });
 
-test('Handout-Abstand berücksichtigt Abtastgrenze; Affinity-Import übernimmt nur einstellbare Tonwerte', async () => {
+test('Alter Affinity-Import meldet neue Berechnung und erhält Tonwerte, Geometrie und Ansicht', async () => {
   const ui = setup();
   await ui.importImage();
-  ui.c.mode.value = 'affinity'; ui.c.mode.fire('input');
-  ui.c.width.value = '14'; ui.c.affinityPreset.fire('click');
-  assert.equal(ui.c.spacing.value, '0.735');
-  ui.c.width.value = '0.1'; ui.c.ppi.value = '36'; ui.c.affinityPreset.fire('click');
-  assert.equal(ui.c.spacing.value, '1.412');
   const data = { format: 'RasterPilot', version: 2,
     settings: { ...ui.ctx.RasterPilotSettings.defaults, mode: 'affinity', levels_blend: 'vivid_light',
       spacing_mm: 1.471, mask_contrast: 42, bw_blue: 150, gamma: 2, black_point: 10, white_point: 200, invert: true },
-    view: { ...ui.ctx.RasterPilotSettings.viewDefaults } };
+    view: { background: 'checker', color: '#123456', zoom: 'actual' } };
   ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
   await ui.c.loadSettings.fire('change');
-  assert.match(ui.c.message.textContent, /feste[n]? Vorgaben/);
+  assert.match(ui.c.message.textContent, /frühere Affinity-Modus/);
   assert.equal(ui.c.black.value, '10');
   assert.equal(ui.c.white.value, '200');
-  assert.equal(ui.c.invert.checked, true);
+  assert.equal(ui.c.invert.checked, false);
+  assert.equal(ui.c.color.value, '#123456');
+  assert.equal(ui.c.background.value, 'checker');
+  assert.equal(ui.c.zoom.value, 'actual');
   await ui.c.render.fire('click');
   assert.equal(ui.submitted().bw_blue, 100);
-  assert.equal(ui.submitted().mask_contrast, 85);
   assert.equal(ui.submitted().gamma, 1);
+  assert.equal(ui.submitted().invert, false);
+  assert.equal(ui.submitted().spacing_mm, 1.471);
   ui.c.saveSettings.fire('click');
   const saved = JSON.parse(await ui.downloads.at(-1).text());
+  assert.equal(saved.version, 3);
   assert.equal(saved.settings.gamma, 1);
   assert.equal(saved.settings.bw_blue, 100);
-  assert.equal(saved.settings.mask_contrast, 85);
   assert.equal(saved.settings.black_point, 10);
   assert.equal(saved.settings.white_point, 200);
+  ui.c.loadSettings.files = [new Blob([JSON.stringify(saved)])];
+  await ui.c.loadSettings.fire('change');
+  assert.doesNotMatch(ui.c.message.textContent, /frühere Affinity-Modus/);
 });
 
-test('Affinity-Vorgaben und Zurücksetzen erhalten das Gamma des einfarbigen Modus', async () => {
+test('Moduswechsel bewahrt getrennte Tonwerte, Gamma und gewählte Vorschaufarbe', async () => {
   const { c, importImage, submitted } = setup();
   await importImage();
   c.mode.value = 'luminance'; c.mode.fire('input');
   c.gamma.value = '2'; c.gamma.fire('input');
+  c.black.value = '20'; c.black.fire('input');
+  c.white.value = '210'; c.white.fire('input');
+  c.invert.checked = true; c.invert.fire('input');
   c.mode.value = 'affinity'; c.mode.fire('input');
-  c.affinityPreset.fire('click');
-  c.resetTones.fire('click');
-  assert.equal(c.gammaControl.hidden, true);
-  assert.equal(c.gamma.value, '2');
+  assert.equal(c.black.value, '0');
+  assert.equal(c.white.value, '245');
+  c.white.value = '180'; c.white.fire('input');
+  c.color.value = '#123456'; c.color.fire('input');
   await c.render.fire('click');
   assert.equal(submitted().gamma, 1);
+  assert.equal(submitted().invert, false);
   c.mode.value = 'luminance'; c.mode.fire('input');
   assert.equal(c.gammaControl.hidden, false);
-  assert.equal(c.gamma.disabled, false);
+  assert.equal(c.invert.disabled, false);
+  assert.equal(c.black.value, '20');
+  assert.equal(c.white.value, '210');
   await c.render.fire('click');
   assert.equal(submitted().gamma, 2);
+  assert.equal(submitted().invert, true);
+  c.mode.value = 'affinity'; c.mode.fire('input');
+  assert.equal(c.white.value, '180');
+  assert.equal(c.color.value, '#123456');
+  c.resetTones.fire('click');
+  assert.equal(c.white.value, '245');
+  assert.equal(c.gamma.value, '2');
+});
+
+test('Altimport im Farbmodus erhält dessen gespeicherte Tonwerte für spätere Helligkeitsraster', async () => {
+  const ui = setup();
+  const data = { format: 'RasterPilot', version: 2,
+    settings: { ...ui.ctx.RasterPilotSettings.defaults, mode: 'color', black_point: 30, white_point: 220, gamma: 2 },
+    view: { ...ui.ctx.RasterPilotSettings.viewDefaults } };
+  ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
+  await ui.c.loadSettings.fire('change');
+  await ui.importImage();
+  ui.c.mode.value = 'luminance'; ui.c.mode.fire('input');
+  await ui.c.render.fire('click');
+  assert.equal(ui.submitted().black_point, 30);
+  assert.equal(ui.submitted().white_point, 220);
+  assert.equal(ui.submitted().gamma, 2);
 });

@@ -47,7 +47,7 @@ def main():
     parser.add_argument('--pattern', choices=('noise', 'gradient'), default='noise',
                         help='Rauschen für PNG-Kompression oder Verlauf für große dekodierte Eingaben.')
     parser.add_argument('--mode', choices=('color', 'luminance', 'alpha', 'affinity'), default='color',
-                        help='Rastermodus (Standard: color).')
+                        help='Rastermodus (Standard: color; affinity = Schwarz durch Shirt ersetzen).')
     args = parser.parse_args()
     if args.source_side < 1 or args.source_side ** 2 > 40_000_000:
         parser.error('Das synthetische Original muss zwischen 1 Pixel und 40 Megapixel groß sein.')

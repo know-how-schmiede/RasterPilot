@@ -87,7 +87,7 @@ Diese Arbeitsanweisung unter `docu/RasterPilot_CODEX_Arbeitsanleitung.md` führe
 - Immer das vollständige Motiv verarbeiten und ausgeben; Zuschnitt auf Anwenderwunsch vorerst entfernt. Seitenverhältnis bei Größenänderung erhalten.
 - Druckbreite in Zentimetern und Ausgabeauflösung festlegen, berechnete Höhe und Pixelmaße anzeigen.
 - Farbiges Motiv gleichmäßig durch transparente Rasterlücken auflockern.
-- Zusätzlich den Affinity-Handout-Ablauf als farbiges Helligkeitsraster anbieten: Tonwertkorrektur und Schwarz-Weiß-Farbregler erzeugen eine runde Rastermaske für die unveränderten Originalfarben. Maskenrichtung, Kontrast und optional Strahlendes Licht anbieten; Beispielwerte als motivabhängige Vorgabe und Berechnungsunterschiede dokumentieren.
+- Zusätzlich den Affinity-Handout-Ablauf als farbiges Helligkeitsraster anbieten: Eine Schwarz-Weiß-Arbeitskopie erzeugt eine runde Rastermaske für die unveränderten Originalfarben. Auf Anwenderwunsch ausschließlich Schwarz- und Weißpunkt als Tonwertregler anbieten. Gamma 1, Kontrast 85, neutrale Farbwerte und Strahlendes Licht fest vorgeben; Maskenrichtung und Rastergeometrie bleiben einstellbar. Beispielwerte als motivabhängige Vorgabe und Berechnungsunterschiede dokumentieren.
 - Klassisches einfarbiges, helligkeitsgesteuertes Halbtonmotiv erzeugen; Druckfarbe und Umkehrung anbieten.
 - Bereits vorhandene weiche Transparenz in Rasterpunkte umsetzen, während vollständig deckende Innenbereiche erhalten bleiben können.
 - Rastergröße, Flächendeckung und optionale Tonwertkorrektur einstellen.
@@ -126,7 +126,7 @@ Deckungswert `c` intern auf 0 bis 1 normieren. Bestehende vollständige Transpar
 | Modus | Grundlage der Deckung | Erwartetes Verhalten |
 | --- | --- | --- |
 | Farbig auflockern | Einstellbare Deckung innerhalb des vorhandenen Motivs | Bildfarben bleiben erhalten; Weiß ist Motivfarbe und wird nicht automatisch entfernt |
-| Farbig nach Helligkeit · Affinity | Tonwertkorrigierte Schwarz-Weiß-Arbeitskopie mit Farbreglern und Maskenkontrast | Standardmäßig Lichter als sichtbare Originalfarben, optional invertiert; nur Maske verändern, Annäherung an Handout dokumentieren |
+| Farbig nach Helligkeit · Affinity | Schwarz-Weiß-Arbeitskopie mit einstellbarem Schwarz-/Weißpunkt und festen übrigen Maskenwerten | Standardmäßig Lichter als sichtbare Originalfarben, optional invertiert; nur Maske verändern, Annäherung an Handout dokumentieren |
 | Einfarbig nach Helligkeit | Tonwertkorrigierte Helligkeit, optional invertiert | Dunkle beziehungsweise bei Umkehr helle Bereiche erzeugen mehr Druckfläche |
 | Transparenz rastern | Vorhandener Alphakanal | Weiche transparente Übergänge werden durch deckende Punkte und transparente Lücken ersetzt |
 

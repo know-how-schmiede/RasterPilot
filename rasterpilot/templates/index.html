@@ -43,26 +43,15 @@
         <details class="advanced"><summary>Erweitert · Tonwerte</summary>
           <label>Schwarzpunkt <input id="black" type="number" min="0" max="254" step="1" value="0" disabled></label>
           <label>Weißpunkt <input id="white" type="number" min="1" max="255" step="1" value="255" disabled></label>
-          <label>Gamma <input id="gamma" type="number" min="0.1" max="5" step="0.1" value="1" disabled></label>
-          <p class="hint">Nur für die Helligkeitsmaske, Farben bleiben unverändert. Schwarzpunkt muss kleiner als Weißpunkt sein. Gamma über 1 hellt die Maske auf: im Affinity-Modus mehr Druckfläche, im einfarbigen Modus weniger; bei Umkehr jeweils umgekehrt. Im Affinity-Modus erfolgt die Feinabstimmung am Arbeitsraster.</p>
+          <label id="gammaControl">Gamma <input id="gamma" type="number" min="0.1" max="5" step="0.1" value="1" disabled></label>
+          <p class="hint">Schwarz- und Weißpunkt steuern ausschließlich die Helligkeitsmaske. Schwarzpunkt muss kleiner als Weißpunkt sein.</p>
           <button id="resetTones" type="button" disabled>Tonwerte zurücksetzen</button>
         </details>
       </div>
       <div id="affinityControls" hidden>
         <button id="affinityPreset" type="button" disabled>Handout-Beispiel übernehmen</button>
         <p class="hint">Schwarz-Weiß → rundes Halbtonraster → Tonwerte abstimmen → Lichter als Maske auf Originalfarben. Helle Stellen bleiben sichtbar. Bei umgekehrter Wirkung „Helligkeit umkehren“ wählen.</p>
-        <label>Maskenkontrast <input id="maskContrast" type="number" min="0" max="100" step="1" value="85" disabled></label>
-        <p class="hint">Höhere Werte schärfen das Arbeitsraster vor der Lichterauswahl. Bei neutralen Tonwerten bleibt die binäre Exportmaske gleich. Eigene Annäherung an das Handout, keine pixelgleiche Affinity-Ausgabe.</p>
-        <details class="advanced"><summary>Erweitert · Schwarz-Weiß und Mischmodus</summary>
-          <label>Mischmodus der Tonwertkorrektur <select id="levelsBlend" disabled><option value="normal">Normal</option><option value="vivid_light">Strahlendes Licht</option></select></label>
-          <label>Rot in % <input id="bwRed" type="number" min="0" max="200" step="1" value="100" disabled></label>
-          <label>Gelb in % <input id="bwYellow" type="number" min="0" max="200" step="1" value="100" disabled></label>
-          <label>Grün in % <input id="bwGreen" type="number" min="0" max="200" step="1" value="100" disabled></label>
-          <label>Cyan in % <input id="bwCyan" type="number" min="0" max="200" step="1" value="100" disabled></label>
-          <label>Blau in % <input id="bwBlue" type="number" min="0" max="200" step="1" value="100" disabled></label>
-          <label>Magenta in % <input id="bwMagenta" type="number" min="0" max="200" step="1" value="100" disabled></label>
-          <p class="hint">100 % ist neutral. Die Farbregler ändern ausschließlich die Helligkeitsmaske. Grau bleibt davon unberührt.</p>
-        </details>
+        <p class="hint">Unter „Erweitert · Tonwerte“ Schwarz- und Weißpunkt abstimmen. Die übrigen Maskenwerte sind fest vorgegeben. Eigene Annäherung, keine pixelgleiche Affinity-Ausgabe.</p>
         <p id="affinityPresetInfo" class="hint">Beispiel: Weißstufe 72 %, Strahlendes Licht, Kontrast 85, 45°. Zellengröße 10 bei 1904 Pixel Bildbreite wird auf die aktuelle Druckbreite umgerechnet; der Abstand bleibt danach in mm eingestellt.</p>
       </div>
       <button type="button" id="render" class="primary">Raster berechnen</button>

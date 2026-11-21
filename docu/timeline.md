@@ -1,5 +1,12 @@
 # Timeline
 
+## 0.5.1 – 21. November 2026
+
+- Auf Anwenderwunsch die Tonwertregler im Affinity-Modus auf Schwarz- und Weißpunkt beschränkt. Sechs Farbregler, Maskenkontrast und Mischmodusauswahl entfernt; Gamma ist ausschließlich im bisherigen einfarbigen Modus einstellbar.
+- Affinity verwendet feste Vorgaben: Gamma 1, Maskenkontrast 85, Strahlendes Licht und neutrale Farbwerte (100 %). Rasterabstand, Winkel, Umkehrung und Handout-Beispiel bleiben verfügbar. Moduswechsel, Beispielübernahme und Affinity-Tonwertreset erhalten das separat einstellbare Gamma des einfarbigen Modus.
+- Bestehendes JSON-Format und Verarbeitungskern bleiben unverändert. Beim Laden früherer Affinity-Dateien werden abweichende zusätzliche Maskenwerte mit Hinweis durch die festen Vorgaben ersetzt; Schwarz-/Weißpunkt und übrige bedienbare Einstellungen bleiben erhalten. Beim Speichern werden die tatsächlich verwendeten Vorgaben ausgegeben.
+- 24 JavaScript- und zwei Anwendungstests erfolgreich, einschließlich vereinfachter Oberfläche, fester Auftrags-/Exportwerte, Import, Gamma-Erhalt beim Moduswechsel sowie Seiten-/Asset-Auslieferung und Versionsmeldung. README, Bedienung, Architektur, Roadmap und Arbeitsanleitung angepasst. Keine Änderungen an Installation, Abhängigkeiten oder Betrieb.
+
 ## 0.5.0 – 21. November 2026
 
 - Rasterprozess um „Farbig nach Helligkeit · Affinity“ nach dem bereitgestellten Handout erweitert. Schwarz-Weiß-Arbeitskopie und rundes Halbtonraster erzeugen eine Lichtermaske für die Originalfarben, optional invertiert. Vorhandene Transparenz wird einmal berücksichtigt; der PNG-Export behält binäres Alpha, sRGB und ppi-Metadaten.

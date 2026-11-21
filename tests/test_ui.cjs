@@ -15,13 +15,12 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   downloadName = 'motiv_rp_280_300ppi_0G.png', states = ['done'], queueError = null } = {}) {
   const controls = {};
   const defaults = { width: '28', ppi: '300', angle: '0', mode: 'color', ink: '#000000',
-    black: '0', white: '255', gamma: '1', maskContrast: '85', levelsBlend: 'normal',
-    bwRed: '100', bwYellow: '100', bwGreen: '100', bwCyan: '100', bwBlue: '100', bwMagenta: '100',
+    black: '0', white: '255', gamma: '1',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
     'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
     'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones', 'cancel',
-    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'affinityControls', 'affinityPreset'];
+    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'gammaControl', 'affinityControls', 'affinityPreset'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
@@ -40,9 +39,10 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   let pending;
   let submitted;
   const calls = [];
+  const downloads = [];
   const ctx = vm.createContext({
     document: { getElementById: id => controls[id] },
-    URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+    URL: { createObjectURL: blob => { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} },
     AbortController, FormData, Blob, setTimeout: (fn, delay) => setTimeout(fn, Math.min(delay, 10)), clearTimeout,
     createImageBitmap: async () => ({ width: 256, height: 256, close() {} }),
     fetch: async (path, request) => {
@@ -68,7 +68,7 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
     controls.file.files = [new Blob(['original'], { type: 'image/png' })];
     await controls.file.fire('change');
   }
-  return { c: controls, importImage, calls, ctx, submitted: () => submitted, defer: promise => { pending = promise; } };
+  return { c: controls, importImage, calls, downloads, ctx, submitted: () => submitted, defer: promise => { pending = promise; } };
 }
 
 test('Import, Berechnung, Download und reine Ansichtsänderungen', async () => {
@@ -354,11 +354,12 @@ test('Affinity-Modus maskiert Originalfarben und übernimmt das skalierte Handou
   assert.equal(c.ink.disabled, true);
   assert.equal(c.coverage.disabled, true);
   assert.equal(c.white.disabled, false);
+  assert.equal(c.gammaControl.hidden, true);
+  assert.equal(c.gamma.disabled, true);
   c.affinityPreset.fire('click');
   assert.equal(c.white.value, '184');
   assert.equal(c.spacing.value, '1.471');
   assert.equal(c.angle.value, '45');
-  assert.equal(c.levelsBlend.value, 'vivid_light');
   assert.equal(c.invert.checked, false);
   assert.match(c.message.textContent, /72 %/);
   await c.render.fire('click');
@@ -368,16 +369,17 @@ test('Affinity-Modus maskiert Originalfarben und übernimmt das skalierte Handou
   assert.equal(submitted().levels_blend, 'vivid_light');
   assert.equal(submitted().ink_color, undefined);
   assert.equal(c.download.hidden, false);
-  c.bwRed.value = '150'; c.bwRed.fire('input');
+  c.white.value = '200'; c.white.fire('input');
   assert.equal(c.download.hidden, true);
   await c.render.fire('click');
-  assert.equal(submitted().bw_red, 150);
+  assert.equal(submitted().white_point, 200);
   c.mode.value = 'color'; c.mode.fire('input');
   assert.equal(c.affinityControls.hidden, true);
-  assert.equal(c.bwRed.disabled, true);
+  const html = readFileSync('rasterpilot/templates/index.html', 'utf8');
+  assert.doesNotMatch(html, /id="(?:bwRed|bwYellow|bwGreen|bwCyan|bwBlue|bwMagenta|maskContrast|levelsBlend)"/);
 });
 
-test('Handout-Abstand berücksichtigt Druckbreite und Abtastgrenze; Affinity-JSON lädt vollständig', async () => {
+test('Handout-Abstand berücksichtigt Abtastgrenze; Affinity-Import übernimmt nur einstellbare Tonwerte', async () => {
   const ui = setup();
   await ui.importImage();
   ui.c.mode.value = 'affinity'; ui.c.mode.fire('input');
@@ -387,14 +389,42 @@ test('Handout-Abstand berücksichtigt Druckbreite und Abtastgrenze; Affinity-JSO
   assert.equal(ui.c.spacing.value, '1.412');
   const data = { format: 'RasterPilot', version: 2,
     settings: { ...ui.ctx.RasterPilotSettings.defaults, mode: 'affinity', levels_blend: 'vivid_light',
-      spacing_mm: 1.471, mask_contrast: 42, bw_blue: 150, invert: true },
+      spacing_mm: 1.471, mask_contrast: 42, bw_blue: 150, gamma: 2, black_point: 10, white_point: 200, invert: true },
     view: { ...ui.ctx.RasterPilotSettings.viewDefaults } };
   ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
   await ui.c.loadSettings.fire('change');
-  assert.equal(ui.c.bwBlue.value, '150');
-  assert.equal(ui.c.maskContrast.value, '42');
+  assert.match(ui.c.message.textContent, /feste[n]? Vorgaben/);
+  assert.equal(ui.c.black.value, '10');
+  assert.equal(ui.c.white.value, '200');
   assert.equal(ui.c.invert.checked, true);
   await ui.c.render.fire('click');
-  assert.equal(ui.submitted().bw_blue, 150);
-  assert.equal(ui.submitted().mask_contrast, 42);
+  assert.equal(ui.submitted().bw_blue, 100);
+  assert.equal(ui.submitted().mask_contrast, 85);
+  assert.equal(ui.submitted().gamma, 1);
+  ui.c.saveSettings.fire('click');
+  const saved = JSON.parse(await ui.downloads.at(-1).text());
+  assert.equal(saved.settings.gamma, 1);
+  assert.equal(saved.settings.bw_blue, 100);
+  assert.equal(saved.settings.mask_contrast, 85);
+  assert.equal(saved.settings.black_point, 10);
+  assert.equal(saved.settings.white_point, 200);
+});
+
+test('Affinity-Vorgaben und Zurücksetzen erhalten das Gamma des einfarbigen Modus', async () => {
+  const { c, importImage, submitted } = setup();
+  await importImage();
+  c.mode.value = 'luminance'; c.mode.fire('input');
+  c.gamma.value = '2'; c.gamma.fire('input');
+  c.mode.value = 'affinity'; c.mode.fire('input');
+  c.affinityPreset.fire('click');
+  c.resetTones.fire('click');
+  assert.equal(c.gammaControl.hidden, true);
+  assert.equal(c.gamma.value, '2');
+  await c.render.fire('click');
+  assert.equal(submitted().gamma, 1);
+  c.mode.value = 'luminance'; c.mode.fire('input');
+  assert.equal(c.gammaControl.hidden, false);
+  assert.equal(c.gamma.disabled, false);
+  await c.render.fire('click');
+  assert.equal(submitted().gamma, 2);
 });

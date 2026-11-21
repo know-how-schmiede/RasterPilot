@@ -1,5 +1,9 @@
 # Architektur
 
+## Vereinfachung 0.5.1: Schwarz- und Weißpunkt
+
+Im Affinity-Modus werden nur Schwarz- und Weißpunkt als Tonwertregler angeboten. Vorgehen: Farb-, Kontrast- und Mischmodusfelder entfernen, Gamma ausschließlich im bisherigen einfarbigen Modus anzeigen, feste Maskenwerte bei Auftrag und JSON-Export einsetzen und die Oberflächenprüfungen anpassen. Der Verarbeitungskern und das JSON-Format bleiben unverändert. Affinity verwendet immer neutrale Farbwerte (100 %), Gamma 1, Kontrast 85 und Strahlendes Licht. Das gilt auch nach dem Import früherer Version-2-Dateien; abweichende zusätzliche Maskenwerte werden mit Hinweis durch die festen Vorgaben ersetzt. Schwarz-/Weißpunkt, Umkehrung, Geometrie und Ansicht bleiben beim Laden erhalten. „Handout-Beispiel übernehmen“ setzt weiterhin Schwarz-/Weißpunkt, Winkel, Abstand und Umkehrung. Ein Moduswechsel beziehungsweise diese Vorgabe verändert das separat einstellbare Gamma des einfarbigen Modus nicht.
+
 ## Erweiterung 0.5.0: farbige Helligkeitsmaske nach dem Affinity-Handout
 
 Grundlage ist `testdata/Workflow_HalfTone_Affinity/handout-halftone-affinity.md`. Der zusätzliche Modus `affinity` verwendet dieselbe finale Größenberechnung, Rastergeometrie und Worker-Pipeline wie die bisherigen Modi. Umsetzungsschritte: validierte Maskenparameter ergänzen, Arbeitskopie für Tonwerte/Schwarz-Weiß berechnen, Maske auf Originalfarben anwenden, passende Bedienelemente und Beispielvorgabe integrieren, JSON migrieren und Kern/Queue/Oberfläche prüfen. Es entstehen keine zusätzlichen Laufzeitabhängigkeiten oder Installationswege.

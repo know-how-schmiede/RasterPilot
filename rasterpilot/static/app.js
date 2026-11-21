@@ -2,9 +2,8 @@
 const $ = id => document.getElementById(id);
 const fields = ['width', 'ppi', 'spacing', 'coverage', 'angle'];
 const toneFields = ['black', 'white', 'gamma'];
-const bwFields = { bw_red: 'bwRed', bw_yellow: 'bwYellow', bw_green: 'bwGreen',
-  bw_cyan: 'bwCyan', bw_blue: 'bwBlue', bw_magenta: 'bwMagenta' };
-const affinityFields = ['maskContrast', ...Object.values(bwFields)];
+const affinityDefaults = Object.freeze({ gamma: 1, mask_contrast: 85, levels_blend: 'vivid_light',
+  bw_red: 100, bw_yellow: 100, bw_green: 100, bw_cyan: 100, bw_blue: 100, bw_magenta: 100 });
 let image = null;
 let originalFile = null;
 let sourceWidth = 0;
@@ -56,8 +55,8 @@ function invalidate() {
 function parameters(checkOutput = true) {
   const mode = $('mode').value;
   const activeFields = fields.filter(id => id !== 'coverage' || mode === 'color');
-  if (['luminance', 'affinity'].includes(mode)) activeFields.push(...toneFields);
-  if (mode === 'affinity') activeFields.push(...affinityFields);
+  if (['luminance', 'affinity'].includes(mode)) activeFields.push('black', 'white');
+  if (mode === 'luminance') activeFields.push('gamma');
   const valid = image && ['color', 'luminance', 'alpha', 'affinity'].includes(mode) &&
     activeFields.every(id => $(id).value !== '' && $(id).checkValidity() && Number.isFinite(Number($(id).value))) &&
     Number.isInteger(Number($('ppi').value));
@@ -73,20 +72,13 @@ function parameters(checkOutput = true) {
   if (['luminance', 'affinity'].includes(mode)) {
     if (mode === 'luminance') p.ink_color = $('ink').value;
     p.invert = $('invert').checked;
-    [p.black_point, p.white_point, p.gamma] = toneFields.map(id => Number($(id).value));
+    [p.black_point, p.white_point] = ['black', 'white'].map(id => Number($(id).value));
+    p.gamma = mode === 'affinity' ? affinityDefaults.gamma : Number($('gamma').value);
     if (!Number.isInteger(p.black_point) || !Number.isInteger(p.white_point) || p.black_point >= p.white_point) {
       throw new Error('Der Schwarzpunkt muss kleiner als der Weißpunkt sein; beide müssen ganze Zahlen sein.');
     }
   }
-  if (mode === 'affinity') {
-    p.mask_contrast = Number($('maskContrast').value);
-    p.levels_blend = $('levelsBlend').value;
-    for (const [key, id] of Object.entries(bwFields)) p[key] = Number($(id).value);
-    if (!['normal', 'vivid_light'].includes(p.levels_blend) ||
-        ![p.mask_contrast, ...Object.keys(bwFields).map(key => p[key])].every(Number.isInteger)) {
-      throw new Error('Bitte gültige Werte für Maskenkontrast, Farbregler und Mischmodus eingeben.');
-    }
-  }
+  if (mode === 'affinity') Object.assign(p, affinityDefaults);
   return p;
 }
 
@@ -99,12 +91,14 @@ function updateMode() {
   $('luminanceControls').hidden = !(luminance || affinity);
   $('inkControl').hidden = !luminance;
   $('ink').disabled = !luminance;
-  for (const id of ['invert', ...toneFields, 'resetTones']) $(id).disabled = !(luminance || affinity);
+  for (const id of ['invert', 'black', 'white', 'resetTones']) $(id).disabled = !(luminance || affinity);
+  $('gammaControl').hidden = !luminance;
+  $('gamma').disabled = !luminance;
   $('affinityControls').hidden = !affinity;
-  for (const id of [...affinityFields, 'levelsBlend', 'affinityPreset']) $(id).disabled = !affinity;
+  $('affinityPreset').disabled = !affinity;
   $('modeInfo').textContent = mode === 'color' ?
     'Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken.' : affinity ?
-    'Wie im Affinity-Handout: Eine Helligkeitsmaske rastert die Originalfarben. Helle Bereiche erzeugen mehr Druckfläche, dunkle werden transparent. Tonwerte und Farbregler beeinflussen nur die Maske.' : luminance ?
+    'Wie im Affinity-Handout: Eine Helligkeitsmaske rastert die Originalfarben. Helle Bereiche erzeugen mehr Druckfläche, dunkle werden transparent. Schwarz- und Weißpunkt beeinflussen nur die Maske.' : luminance ?
     'Dunkle Bildstellen erzeugen mehr Druckfläche in der gewählten Druckfarbe. Vorhandene Transparenz bleibt berücksichtigt.' :
     'Weiche Transparenz wird in deckende Punkte umgewandelt. Vollständig deckende Bereiche und die Bildfarben bleiben erhalten; ohne Transparenz entstehen keine Lücken.';
 }
@@ -286,14 +280,14 @@ $('render').addEventListener('click', async () => {
 $('cancel').addEventListener('click', () => { invalidate(); renderOriginal(); message('Berechnung abgebrochen.'); });
 
 const presetFields = { width_cm: 'width', ppi: 'ppi', spacing_mm: 'spacing', coverage: 'coverage',
-  angle_deg: 'angle', mode: 'mode', ink_color: 'ink', invert: 'invert', black_point: 'black', white_point: 'white', gamma: 'gamma',
-  mask_contrast: 'maskContrast', levels_blend: 'levelsBlend', ...bwFields };
+  angle_deg: 'angle', mode: 'mode', ink_color: 'ink', invert: 'invert', black_point: 'black', white_point: 'white', gamma: 'gamma' };
 
 $('saveSettings').addEventListener('click', () => {
   try {
-    const p = Object.fromEntries(Object.entries(presetFields).map(([key, id]) => [key,
-      key === 'invert' ? $(id).checked : ['mode', 'ink_color', 'levels_blend'].includes(key) ? $(id).value :
-        $(id).value === '' ? NaN : Number($(id).value)]));
+    const p = { ...affinityDefaults, ...Object.fromEntries(Object.entries(presetFields).map(([key, id]) => [key,
+      key === 'invert' ? $(id).checked : ['mode', 'ink_color'].includes(key) ? $(id).value :
+        $(id).value === '' ? NaN : Number($(id).value)])) };
+    if (p.mode === 'affinity') p.gamma = affinityDefaults.gamma;
     const view = { background: $('background').value, color: $('color').value, zoom: $('zoom').value };
     const json = RasterPilotSettings.serialize(p, view);
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
@@ -314,6 +308,7 @@ $('loadSettings').addEventListener('change', async event => {
     const data = RasterPilotSettings.parse(await file.text());
     if (current !== presetSequence) return;
     for (const [key, id] of Object.entries(presetFields)) {
+      if (key === 'gamma' && data.settings.mode === 'affinity') continue;
       if (key === 'invert') $(id).checked = data.settings[key];
       else $(id).value = String(data.settings[key]);
     }
@@ -321,12 +316,15 @@ $('loadSettings').addEventListener('change', async event => {
     updateMode(); invalidate(); renderOriginal();
     message(image ? ($('render').disabled ? `Einstellungen geladen. ${$('message').textContent}` :
       'Einstellungen geladen. Raster bitte neu berechnen.') : 'Einstellungen geladen. Bitte ein Bild auswählen.');
+    if (data.settings.mode === 'affinity' && Object.entries(affinityDefaults).some(([key, value]) => data.settings[key] !== value)) {
+      message(`${$('message').textContent} Zusätzliche Maskenwerte wurden auf die festen Vorgaben gesetzt.`);
+    }
   } catch (error) { if (current === presetSequence) message(`Einstellungen nicht geladen: ${error.message}`); }
   finally { if (current === presetSequence) event.target.value = ''; }
 });
 
 for (const id of fields) $(id).addEventListener('input', () => { invalidate(); renderOriginal(); });
-for (const id of ['mode', 'ink', 'invert', ...toneFields, ...affinityFields, 'levelsBlend']) $(id).addEventListener('input', () => {
+for (const id of ['mode', 'ink', 'invert', ...toneFields]) $(id).addEventListener('input', () => {
   updateMode(); invalidate(); renderOriginal();
 });
 $('affinityPreset').addEventListener('click', () => {
@@ -342,14 +340,13 @@ $('affinityPreset').addEventListener('click', () => {
     message('Das Handout-Beispiel ergibt mehr als 10 mm Rasterabstand. Bitte die Druckbreite verringern.'); return;
   }
   $('mode').value = 'affinity'; $('angle').value = '45'; $('spacing').value = String(spacing);
-  $('black').value = '0'; $('white').value = '184'; $('gamma').value = '1';
-  $('invert').checked = false; $('maskContrast').value = '85'; $('levelsBlend').value = 'vivid_light';
-  for (const id of Object.values(bwFields)) $(id).value = '100';
+  $('black').value = '0'; $('white').value = '184'; $('invert').checked = false;
   updateMode(); invalidate(); renderOriginal();
   if (!$('render').disabled) message(`Handout-Beispiel übernommen: Weißpunkt 184 ≈ 72 %, Rasterabstand ${spacing.toFixed(3)} mm. Raster neu berechnen und bei 100 % prüfen.${spacing > requested + 0.001 ? ' Der Abstand wurde auf die Mindestgröße von zwei Exportpixeln angehoben.' : ''}`);
 });
 $('resetTones').addEventListener('click', () => {
-  $('black').value = '0'; $('white').value = '255'; $('gamma').value = '1';
+  $('black').value = '0'; $('white').value = '255';
+  if ($('mode').value === 'luminance') $('gamma').value = '1';
   invalidate(); renderOriginal();
 });
 for (const id of ['color', 'background', 'view', 'zoom']) $(id).addEventListener('input', updateView);

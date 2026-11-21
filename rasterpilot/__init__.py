@@ -117,7 +117,19 @@ def create_app(config=None):
 
     def job_response(job):
         return jsonify(id=job['id'], state=job['state'], error=job['error'],
-                       width=job['width'], height=job['height'], worker_ready=jobs.available())
+                       original_name=job['original_name'] or 'Früherer Auftrag',
+                       filename=job['filename'], width=job['width'], height=job['height'], worker_ready=jobs.available())
+
+    @app.get('/api/jobs')
+    def job_list():
+        rows, active, running = jobs.listing(owner())
+        return jsonify(jobs=[dict(id=row['id'], state=row['state'], error=row['error'],
+                                 original_name=row['original_name'] or 'Früherer Auftrag',
+                                 filename=row['filename'], width=row['width'], height=row['height'],
+                                 position=row['position'], created=row['created'], expires_at=row['expires_at'])
+                             for row in rows],
+                       active=active, running=running, capacity=jobs.capacity,
+                       worker_ready=jobs.available())
 
     @app.post('/api/prepare')
     def prepare():
@@ -144,9 +156,11 @@ def create_app(config=None):
         if not jobs.available():
             return jsonify(error='Der Hintergrunddienst ist nicht bereit. Bitte den RasterPilot-Worker starten oder den Dienststatus prüfen.'), 503
         filename = export_filename(request.files['image'].filename, parameters)
+        original_name = re.split(r'[/\\]', request.files['image'].filename or '')[-1]
+        original_name = re.sub(r'[\x00-\x1f\x7f]', '', original_name)[:255] or 'motiv'
         request.files['image'].stream.seek(0)
         job = jobs.enqueue(owner(), request.files['image'].stream.read(), json.dumps(asdict(parameters)),
-                           filename, (width, height))
+                           filename, (width, height), original_name=original_name)
         return job_response(job), 202
 
     @app.get('/api/jobs/<job_id>')

@@ -133,7 +133,7 @@ journalctl -u rasterpilot -u rasterpilot-worker -n 50 --no-pager
 
 `/health` prüft weiterhin nur den Webstart. `/ready` muss HTTP 200 mit `status: ok` liefern; HTTP 503 bedeutet einen fehlenden oder nicht mehr aktuellen Worker-Heartbeat. „Hintergrunddienst nicht bereit“ im Browser: zunächst `systemctl restart rasterpilot-worker` und das Protokoll prüfen. Nach einem Worker-Neustart werden unterbrochene laufende Aufträge als fehlgeschlagen gemeldet; wartende Aufträge können weiterverarbeitet werden.
 
-Standardgrenzen: ein rechnender Auftrag, höchstens vier aktive/wartende und acht gespeicherte Aufträge, 1 GiB reservierter temporärer Bildspeicher, eine Stunde Aufbewahrung und 180 Sekunden je Berechnung. Zusätzlich zu Anwendung und Releases entsprechend freien Speicherplatz für die temporären Daten vorsehen. Abgelaufene Dateien werden nur bei laufendem Worker bereinigt. Die Höchstzahl gilt über alle Zugänge; je Browserprofil ist nur ein aktiver Auftrag erlaubt. Alle bisherigen Upload- und Ausgabegrenzen gelten weiter. Sitzungscookies trennen Aufträge verschiedener Browserzugänge, ersetzen aber keine Benutzeranmeldung; weiterhin nur im vertrauenswürdigen Netz betreiben.
+Aktuelle Standardgrenzen ab 0.7.0: ein rechnender Auftrag, höchstens zehn aktive/wartende und 20 insgesamt gespeicherte Aufträge, 1 GiB reservierter temporärer Bildspeicher, eine Stunde Aufbewahrung und 180 Sekunden je Berechnung. Zusätzlich zu Anwendung und Releases entsprechend freien Speicherplatz für die temporären Daten vorsehen. Abgelaufene Dateien werden nur bei laufendem Worker bereinigt. Die Höchstzahlen gelten über alle Zugänge; ein Browserprofil darf mehrere der zehn Plätze belegen. Speicherquote und Anzahl gespeicherter Ergebnisse können die Annahme schon vor zehn aktiven Aufträgen begrenzen. Alle bisherigen Upload- und Ausgabegrenzen gelten weiter. Sitzungscookies trennen Aufträge verschiedener Browserzugänge, ersetzen aber keine Benutzeranmeldung; weiterhin nur im vertrauenswürdigen Netz betreiben.
 
 Optionale Einstellungen können in `/etc/rasterpilot/environment` liegen. Das Verzeichnis und die Datei selbst als root anlegen und nur für root lesbar halten. Beispiel für kleinere Grenzen:
 
@@ -145,9 +145,17 @@ RASTERPILOT_JOB_TTL=3600
 RASTERPILOT_JOB_TIMEOUT=180
 ```
 
-Zulässige Bereiche: Warteschlange 1–4, gespeicherte Aufträge 1–8, Speicher 32–1024 MiB, Aufbewahrung 60–86400 Sekunden und Berechnungszeit 1–600 Sekunden. Kleine Speichergrenzen können große Ausgaben bereits bei der Annahme ausschließen. Bei eingerichtetem HTTPS zusätzlich `RASTERPILOT_COOKIE_SECURE=1` setzen; für den bisherigen HTTP-Zugang weglassen. Web und Worker anschließend gemeinsam mit `systemctl restart rasterpilot-worker rasterpilot` neu starten. Eigene Umgebungsdateien werden beim Update erhalten.
+Zulässige Bereiche: Warteschlange 1–10, gespeicherte Aufträge 1–20, Speicher 32–1024 MiB, Aufbewahrung 60–86400 Sekunden und Berechnungszeit 1–600 Sekunden. Kleine Speichergrenzen können große Ausgaben bereits bei der Annahme ausschließen. Bei eingerichtetem HTTPS zusätzlich `RASTERPILOT_COOKIE_SECURE=1` setzen; für den bisherigen HTTP-Zugang weglassen. Web und Worker anschließend gemeinsam mit `systemctl restart rasterpilot-worker rasterpilot` neu starten. Eigene Umgebungsdateien werden beim Update erhalten.
 
 Diese Einrichtung und die Rückfallpfade sind lokal mit isolierten Systembefehlen getestet. Eine echte Neuinstallation/Umstellung auf Debian 13 sowie ein paralleler Lasttest im 4-GB-LXC stehen für 0.4.0 noch aus.
+
+### Update auf 0.7.0: Auftragsliste und zehn Warteschlangenplätze
+
+Mit dem vorhandenen Updater aktualisieren und die Browserseite vollständig neu laden. Ohne eigene Grenzwerte gelten automatisch zehn aktive/wartende und 20 gespeicherte Aufträge. Falls `/etc/rasterpilot/environment` niedrigere Werte enthält, bleiben diese bewusst erhalten. Für die neuen Standardgrenzen die beiden Einträge entfernen oder auf `RASTERPILOT_QUEUE_LIMIT=10` und `RASTERPILOT_RETAINED_JOBS=20` setzen; danach Web und Worker gemeinsam neu starten. Die Speichergrenze bleibt 1 GiB, weil weiterhin ein Auftrag gleichzeitig rechnet.
+
+Die Anwendung legt automatisch die zusätzliche SQLite-Tabelle `job_metadata` für Originaldateinamen an. Das bisherige `jobs`-Tabellenschema bleibt unverändert, damit die vorige Version beim Update-Rückfall weiter schreiben kann. Ältere Aufträge ohne gespeicherten Originalnamen erscheinen als „Früherer Auftrag“. Neue Aufträge werden mit pfadbereinigtem Originalnamen angezeigt; Metadaten werden beim Aufräumen mit entfernt.
+
+Die Liste unter der Vorschau zeigt nur eigene Aufträge dieses Browserprofils und daneben die anonyme Gesamtauslastung. Sie wird etwa alle zwei Sekunden aktualisiert. Fertige Ergebnisse bleiben bis zum angezeigten Ablaufzeitpunkt abrufbar, normalerweise eine Stunde nach Fertigstellung. „Entfernen“ macht den Eintrag sofort unzugänglich; der Worker gibt die Dateien beim nächsten Aufräumen frei. Angenommene Aufträge laufen bei Bild-/Einstellungswechsel oder Schließen der Seite weiter; beim erneuten Öffnen mit demselben Sitzungscookie sind sie wieder sichtbar. Cookie-Löschung oder ein anderes Browserprofil verliert den Zugriff. Keine zusätzlichen Dienste oder Nginx-Änderungen erforderlich.
 
 ## Status und Fehlerbehebung
 

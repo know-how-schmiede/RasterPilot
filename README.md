@@ -8,7 +8,7 @@ Vom Bild zum druckfertigen Halbtonraster.
 
 RasterPilot ist als deutschsprachige Web-App geplant, die Fotos und Grafiken in Halbtonraster für DTF-Druckvorlagen umwandelt. Dabei entstehen Rasterpunkte mit transparenten Zwischenräumen. Die Anwendung soll auf Desktop und Tablet im Browser bedient werden und ohne GPU auskommen.
 
-> **Projektstatus:** Vier Rastermodi einschließlich selektiver Rasterung für schwarze Shirts, transparenter PNG-Export, ein separater Hintergrund-Worker mit begrenzter Warteschlange und JSON-Einstellungen sind experimentell verfügbar. Druckkalibrierung und vollständige Betriebsabnahme stehen aus.
+> **Projektstatus:** Vier Rastermodi einschließlich selektiver Rasterung für schwarze Shirts, transparenter PNG-Export, ein Hintergrund-Worker mit zehn Warteschlangenplätzen, eigene Auftragsliste und JSON-Einstellungen sind experimentell verfügbar. Druckkalibrierung und vollständige Betriebsabnahme stehen aus.
 
 ## Installation auf Debian 13
 
@@ -34,7 +34,7 @@ python -m rasterpilot.worker
 
 Unter Windows entsprechend `.venv\Scripts\python.exe -m rasterpilot.worker` verwenden. Beide Prozesse müssen dasselbe Datenverzeichnis verwenden; Vorgabe ist `instance/jobs` im Arbeitsverzeichnis. Alternativ für beide `RASTERPILOT_DATA_DIR` setzen. Ohne laufenden Worker funktioniert der Import, eine Rasterberechnung wird mit einer verständlichen Meldung abgewiesen. `/health` prüft den Webprozess, `/ready` zusätzlich den Worker. Auf Debian starten beide Dienste automatisch; für bestehende Installationen die [Umstellung auf 0.4.0](docu/INSTALLATION_Debian13.md#update-auf-040-hintergrundverarbeitung) beachten.
 
-Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen. Die Oberflächen-Zustandstests benötigen zusätzlich Node.js und laufen mit `node --test tests/test_ui.cjs tests/test_settings.cjs`; die isolierten Installations-/Updatetests mit `node --test tests/test_install_scripts.cjs tests/test_services.cjs` benötigen außerdem eine POSIX-Shell (unter Windows Git Bash). Node.js wird für den Betrieb der Anwendung nicht benötigt.
+Anschließend `http://127.0.0.1:5000` im Browser öffnen. Der Entwicklungsserver ist nicht für den Produktionsbetrieb vorgesehen. Tests lassen sich mit `python -m unittest discover -s tests` ausführen. Die Oberflächen-Zustandstests benötigen zusätzlich Node.js und laufen mit `node --test tests/test_ui.cjs tests/test_settings.cjs tests/test_queue_ui.cjs`; die isolierten Installations-/Updatetests mit `node --test tests/test_install_scripts.cjs tests/test_services.cjs` benötigen außerdem eine POSIX-Shell (unter Windows Git Bash). Node.js wird für den Betrieb der Anwendung nicht benötigt.
 
 Der aktuelle Ablauf importiert PNG/JPEG, berücksichtigt EXIF-Orientierung und Farbprofile und verarbeitet immer das vollständige Bild. Druckgrößenberechnung, vier Rastermodi mit einstellbarem Winkel (−180° bis +180°, Vorgabe 0°) sowie PNG-Export mit sRGB-Profil, binärem Alpha und ppi-Metadaten sind verfügbar. Im einfarbigen Modus lassen sich Druckfarbe, Umkehrung, Schwarz-/Weißpunkt und Gamma einstellen. „Schwarz durch Shirt ersetzen“ löst ab 0.6.0 den Affinity-Modus ab: Schwarz wird transparent, helle und kräftige Farbflächen bleiben geschlossen, Übergänge zu Schwarz erhalten aufgehellte Rasterpunkte. Nur Schwarz-/Weißpunkt sind als Tonwerte einstellbar; Vorgabe 0/245. Die gemittelte Bildwirkung auf Schwarz wird rechnerisch angenähert. Das Transparenzraster erhält deckende Motivbereiche. JSON-Version 3 importiert weiterhin Versionen 1/2 und weist bei alten Affinity-Dateien auf die geänderte Berechnung hin. Originalvergleich, 100-%-Ergebnisansicht, Transparenzraster als Ansichtshilfe und Textilfarbe helfen beim Prüfen. Die [Bedienungsanleitung](docu/BEDIENUNG.md) erklärt die Schritte und Grenzen.
 
@@ -48,6 +48,7 @@ Bilder werden an den eigenen RasterPilot-Server übertragen, dort verarbeitet un
 - Rastergröße, Winkel, Deckung und bei Bedarf Tonwerte einstellen sowie das Ergebnis mit dem Original vergleichen.
 - Das Ergebnis mit Zoom, Transparenzraster und einer wählbaren Textilfarbe als Vorschau betrachten.
 - Ein transparentes PNG in der berechneten Druckgröße exportieren und Einstellungen als JSON speichern und wieder laden.
+- Bis zu zehn aktive/wartende Aufträge einreichen. Unter der Vorschau eigene Originaldateinamen, Status und Warteposition sehen; fertige Ergebnisse bis zum Ablauf auch nach Neuladen anzeigen und herunterladen. Die Gesamtauslastung wird anonym angezeigt, fremde Dateinamen bleiben verborgen.
 
 Die Textilfarbe dient nur der Vorschau und wird nicht in das Exportbild eingerechnet. Automatische Freistellung, weitere Punktformen, Stapelverarbeitung und eine NeoFab2-Anbindung sind für spätere Ausbaustufen vorgesehen.
 

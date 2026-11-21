@@ -18,7 +18,7 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
     black: '0', white: '255', gamma: '1',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
-    'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
+    'download', 'result', 'renderState', 'resultOption', 'originalOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
     'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones', 'cancel',
     'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'gammaControl', 'invertControl', 'affinityControls'];
   for (const name of names) {
@@ -40,7 +40,9 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   let submitted;
   const calls = [];
   const downloads = [];
+  let queueCallbacks;
   const ctx = vm.createContext({
+    RasterPilotJobs: { refresh: async () => {}, start: callbacks => { queueCallbacks = callbacks; } },
     document: { getElementById: id => controls[id] },
     URL: { createObjectURL: blob => { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} },
     AbortController, FormData, Blob, setTimeout: (fn, delay) => setTimeout(fn, Math.min(delay, 10)), clearTimeout,
@@ -68,7 +70,8 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
     controls.file.files = [new Blob(['original'], { type: 'image/png' })];
     await controls.file.fire('change');
   }
-  return { c: controls, importImage, calls, downloads, ctx, submitted: () => submitted, defer: promise => { pending = promise; } };
+  return { c: controls, importImage, calls, downloads, ctx, queueCallbacks: () => queueCallbacks,
+    submitted: () => submitted, defer: promise => { pending = promise; } };
 }
 
 test('Import, Berechnung, Download und reine Ansichtsänderungen', async () => {
@@ -269,7 +272,7 @@ test('Verspätetes Ergebnis überschreibt keinen neuen Modus', async () => {
   await rendering;
   assert.equal(ui.c.download.hidden, true);
   assert.equal(ui.c.result.hidden, true);
-  assert.ok(ui.calls.some(([path, method]) => path === '/api/jobs/job1' && method === 'DELETE'));
+  assert.equal(ui.calls.some(([path, method]) => path === '/api/jobs/job1' && method === 'DELETE'), false);
 });
 
 test('Einstellungen lassen sich ohne Bild speichern und nach Import vollständig anwenden', async () => {
@@ -454,4 +457,22 @@ test('Altimport im Farbmodus erhält dessen gespeicherte Tonwerte für spätere 
   assert.equal(ui.submitted().black_point, 30);
   assert.equal(ui.submitted().white_point, 220);
   assert.equal(ui.submitted().gamma, 2);
+});
+
+test('Fertige Ergebnisse bleiben bei Einstellungswechseln gespeichert und nach Neuladen abrufbar', async () => {
+  const ui = setup();
+  await ui.importImage();
+  await ui.c.render.fire('click');
+  ui.c.coverage.value = '40'; ui.c.coverage.fire('input');
+  assert.equal(ui.calls.some(([, method]) => method === 'DELETE'), false);
+  const fresh = setup();
+  await fresh.queueCallbacks().show({ id: 'job1', original_name: 'Gespeichertes Original.png' });
+  assert.equal(fresh.c.result.hidden, false);
+  assert.equal(fresh.c.download.hidden, false);
+  assert.equal(fresh.c.viewSettings.disabled, false);
+  assert.equal(fresh.c.originalOption.disabled, true);
+  assert.match(fresh.c.renderState.textContent, /Gespeichertes Original/);
+  fresh.queueCallbacks().removed('job1');
+  assert.equal(fresh.c.download.hidden, true);
+  assert.equal(fresh.c.empty.hidden, false);
 });

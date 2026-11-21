@@ -20,7 +20,6 @@ let resultUrl = null;
 let hasResult = false;
 let activeJob = null;
 let resultJob = null;
-let cancellation = Promise.resolve();
 let submission = Promise.resolve();
 let presetSequence = 0;
 const message = text => { $('message').textContent = text; };
@@ -29,22 +28,14 @@ function cancelRequest() {
   ++sequence;
   if (controller) controller.abort();
   controller = null;
-  if (activeJob) {
-    const job = activeJob;
-    activeJob = null;
-    cancellation = fetch(`/api/jobs/${job}`, { method: 'DELETE', headers: { 'X-RasterPilot-Request': '1' } }).catch(() => {});
-  }
+  activeJob = null;
   $('cancel').hidden = true;
   $('stage').setAttribute('aria-busy', 'false');
 }
 
 function invalidate() {
   cancelRequest();
-  if (resultJob) {
-    const job = resultJob;
-    resultJob = null;
-    fetch(`/api/jobs/${job}`, { method: 'DELETE', headers: { 'X-RasterPilot-Request': '1' } }).catch(() => {});
-  }
+  resultJob = null;
   hasResult = false;
   $('download').hidden = true;
   $('download').removeAttribute('href');
@@ -54,6 +45,7 @@ function invalidate() {
   resultUrl = null;
   $('view').value = 'original';
   $('resultOption').disabled = true;
+  $('originalOption').disabled = !image;
   $('renderState').textContent = 'Noch kein aktuelles Raster';
   updateView();
 }
@@ -114,6 +106,7 @@ function updateView() {
   const showResult = hasResult && $('view').value === 'result';
   $('canvas').hidden = !image || showResult || !$('render').dataset.valid;
   $('result').hidden = !showResult;
+  $('empty').hidden = Boolean(image || showResult);
   $('zoom').disabled = !showResult;
   $('stage').classList.toggle('actual-size', showResult && $('zoom').value === 'actual');
   $('stage').classList.toggle('checker', $('background').value === 'checker');
@@ -122,6 +115,7 @@ function updateView() {
 
 function renderOriginal() {
   if (!image) return;
+  $('originalOption').disabled = false;
   try {
     const p = parameters(false);
     const pw = Math.max(1, Math.round(p.width_cm / 2.54 * p.ppi));
@@ -207,6 +201,28 @@ function pause(signal) {
   });
 }
 
+async function loadResult(job, current, signal, archived = false) {
+  const response = await requestImage(`/api/jobs/${job.id}/result`, undefined, signal, 'GET');
+  const blob = await response.blob();
+  if (current !== sequence) return;
+  resultUrl = URL.createObjectURL(blob);
+  $('result').src = resultUrl;
+  await $('result').decode();
+  if (current !== sequence) return;
+  hasResult = true; resultJob = job.id; activeJob = null;
+  $('resultOption').disabled = false;
+  $('originalOption').disabled = archived || !image;
+  $('viewSettings').disabled = false;
+  $('view').value = 'result';
+  $('download').href = resultUrl;
+  $('download').download = decodeURIComponent(response.headers.get('X-Download-Name'));
+  $('download').hidden = false;
+  $('renderState').textContent = `${job.original_name || ''} · ${response.headers.get('X-Image-Width')} × ${response.headers.get('X-Image-Height')} px · PNG bereit`;
+  message(archived ? 'Gespeichertes Ergebnis angezeigt. Die aktuellen Bildeinstellungen wurden nicht übernommen.' :
+    'Raster berechnet. Vor dem Export die Punkte bei 100 % prüfen.');
+  updateView();
+}
+
 $('render').addEventListener('click', async () => {
   let p;
   try { p = parameters(); } catch (error) { message(error.message); return; }
@@ -222,22 +238,17 @@ $('render').addEventListener('click', async () => {
     data.append('image', originalFile);
     data.append('parameters', JSON.stringify(p));
     await submission;
-    await cancellation;
     if (current !== sequence) return;
-    // Die Annahmebestätigung abwarten, damit auch ein zwischenzeitlicher
-    // Einstellungswechsel den bereits angelegten Auftrag abbrechen kann.
+    // Annahmen serialisieren; danach bleibt jeder Auftrag in der Liste erhalten.
     const accepting = requestImage('/api/jobs', data).then(response => response.json());
-    submission = accepting.then(job => {
-      if (current !== sequence) return fetch(`/api/jobs/${job.id}`, {
-        method: 'DELETE', headers: { 'X-RasterPilot-Request': '1' }
-      }).catch(() => {});
-    }).catch(() => {});
+    submission = accepting.then(() => {}).catch(() => {});
     const job = await accepting;
+    await RasterPilotJobs.refresh();
     if (current !== sequence) {
-      await submission;
       return;
     }
     activeJob = job.id;
+    $('render').disabled = false;
     while (true) {
       const statusResponse = await requestImage(`/api/jobs/${job.id}`, undefined, controller.signal, 'GET');
       const status = await statusResponse.json();
@@ -248,34 +259,13 @@ $('render').addEventListener('click', async () => {
         status.state === 'queued' ? 'Auftrag wartet in der Warteschlange …' : 'Raster wird im Hintergrund in Exportauflösung berechnet …');
       await pause(controller.signal);
     }
-    const response = await requestImage(`/api/jobs/${job.id}/result`, undefined, controller.signal, 'GET');
-    const blob = await response.blob();
-    if (current !== sequence) return;
-    resultUrl = URL.createObjectURL(blob);
-    $('result').src = resultUrl;
-    await $('result').decode();
-    if (current !== sequence) return;
-    hasResult = true;
-    resultJob = job.id;
-    activeJob = null;
-    $('resultOption').disabled = false;
-    $('view').value = 'result';
-    $('download').href = resultUrl;
-    $('download').download = decodeURIComponent(response.headers.get('X-Download-Name'));
-    $('download').hidden = false;
-    $('renderState').textContent = `${response.headers.get('X-Image-Width')} × ${response.headers.get('X-Image-Height')} px · PNG bereit`;
-    message('Raster berechnet. Vor dem Export die Punkte bei 100 % prüfen.');
-    updateView();
+    await loadResult(job, current, controller.signal);
   } catch (error) {
     if (current === sequence && error.name !== 'AbortError') {
-      if (activeJob) {
-        const job = activeJob;
-        activeJob = null;
-        cancellation = fetch(`/api/jobs/${job}`, { method: 'DELETE', headers: { 'X-RasterPilot-Request': '1' } }).catch(() => {});
-      }
       message(error.message);
     }
   } finally {
+    await RasterPilotJobs.refresh();
     if (current === sequence) {
       $('cancel').hidden = true;
       $('render').disabled = false;
@@ -284,7 +274,15 @@ $('render').addEventListener('click', async () => {
   }
 });
 
-$('cancel').addEventListener('click', () => { invalidate(); renderOriginal(); message('Berechnung abgebrochen.'); });
+$('cancel').addEventListener('click', async () => {
+  const id = activeJob;
+  invalidate(); renderOriginal();
+  if (!id) { message('Übertragung läuft noch. Nach Annahme kann der Auftrag in der Liste abgebrochen werden.'); return; }
+  try {
+    await requestImage(`/api/jobs/${id}`, undefined, undefined, 'DELETE');
+    message('Berechnung abgebrochen.'); await RasterPilotJobs.refresh();
+  } catch (error) { message(error.message); }
+});
 
 const presetFields = { width_cm: 'width', ppi: 'ppi', spacing_mm: 'spacing', coverage: 'coverage',
   angle_deg: 'angle', mode: 'mode', ink_color: 'ink', invert: 'invert', black_point: 'black', white_point: 'white', gamma: 'gamma' };
@@ -358,3 +356,18 @@ $('resetTones').addEventListener('click', () => {
 });
 for (const id of ['color', 'background', 'view', 'zoom']) $(id).addEventListener('input', updateView);
 updateMode();
+RasterPilotJobs.start({
+  show: async job => {
+    invalidate();
+    resultJob = job.id;
+    const current = sequence;
+    controller = new AbortController();
+    $('stage').setAttribute('aria-busy', 'true');
+    try { await loadResult(job, current, controller.signal, true); }
+    catch (error) { if (current === sequence && error.name !== 'AbortError') throw error; }
+    finally { if (current === sequence) $('stage').setAttribute('aria-busy', 'false'); }
+  },
+  removed: id => {
+    if (activeJob === id || resultJob === id) { invalidate(); renderOriginal(); }
+  }
+});

@@ -1,5 +1,14 @@
 # Timeline
 
+## 0.7.0 – 21. November 2026
+
+- Globale Warteschlange auf zehn aktive/wartende Aufträge erhöht und mehrere Aufträge desselben Browserzugangs erlaubt. Weiterhin genau ein rechnender Worker; die Speicherquote bleibt 1 GiB. Maximal 20 gespeicherte Aufträge lassen zusätzlich fertige Ergebnisse zu. Bestehende kleinere Umgebungswerte bleiben wirksam.
+- Unter der Bildvorschau „Deine Aufträge“ ergänzt: Originaldateiname mit Endung, Status, globale Position und Aktionen. Gesamtauslastung/Workerbereitschaft werden anonym angezeigt; Dateinamen, IDs und Ergebnisse fremder Zugänge bleiben verborgen. Die Liste aktualisiert sich etwa alle zwei Sekunden. Dateinamen werden pfadbereinigt gespeichert und ausschließlich als Text eingesetzt.
+- Abgeschlossene Aufträge erscheinen grün als „Fertig“, mit „Ergebnis anzeigen“, „PNG herunterladen“, Ablaufzeit und „Entfernen“. Sie bleiben standardmäßig eine Stunde nach Fertigstellung über das bestehende Sitzungscookie abrufbar, auch nach Neuladen und ohne Originalupload. Gespeicherte Vorschauen nennen den Originalnamen und sperren den Vergleich mit einem möglicherweise anderen Original. Fehlerhafte/abgebrochene Aufträge bieten keinen Download.
+- Bild-/Einstellungswechsel lassen angenommene Aufträge und fertige Ergebnisse bestehen. Ein weiterer Auftrag kann nach Annahme eingereicht werden; Abbruch und Entfernen sind ausdrückliche Aktionen. Veraltete Antworten überschreiben keine neueren Vorschauen. Listenfehler lassen bisherige Einträge stehen und werden erneut abgefragt.
+- Sitzungsgebundenes `GET /api/jobs` ergänzt. Originalnamen liegen in der automatisch angelegten Zusatztabelle `job_metadata`; das bisherige jobs-Schema bleibt für Versionsrückfälle unverändert. Alte Aufträge ohne Metadaten heißen „Früherer Auftrag“. Bereinigung entfernt auch verwaiste Namensmetadaten. Beide Installationsdokumente, Bedienung, Architektur, README, Arbeitsanleitung und Roadmap aktualisiert; Installationsskripte und Dienste unverändert.
+- 59 Python- und 29 JavaScript-Prüfungen erfolgreich: konkurrierende Annahme genau bis zehn einschließlich gleicher Browserkennung, elfter Auftrag abgewiesen, FIFO, eigene Originalnamen, anonyme Zähler, Origin-/Sitzungsschutz, fertige Downloads über den echten Worker, Metadatenbereinigung und alter positionaler jobs-INSERT nach Schemaerweiterung. Oberfläche auf Statuswechsel, sicheren Dateinamentext, Vorschau ohne Upload, UTF-8-Downloadnamen, Wiederabruf und Nichtlöschen bei Einstellungswechsel geprüft. Visuelle Browserprüfung, echte Debian-Umstellung und LXC-Lasttest bleiben offen.
+
 ## 0.6.0 – 21. November 2026
 
 - Den bisherigen Affinity-Modus auf Anwenderwunsch durch „Schwarz durch Shirt ersetzen“ abgelöst; API-Wert `affinity` bleibt erhalten. Schwarz wird transparent, helle und kräftige Farbflächen bleiben geschlossen. Auch farbige Übergänge zu Schwarz werden gerastert.

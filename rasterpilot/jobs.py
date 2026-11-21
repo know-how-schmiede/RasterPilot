@@ -26,20 +26,24 @@ class JobStore:
                 raise ValueError(f'{key} muss zwischen {minimum} und {maximum} liegen.')
             return value
         return cls(root, ttl=setting('RASTERPILOT_JOB_TTL', 3600, 86400, 60),
-                   capacity=setting('RASTERPILOT_QUEUE_LIMIT', 4, 4),
-                   retained=setting('RASTERPILOT_RETAINED_JOBS', 8, 8),
+                   capacity=setting('RASTERPILOT_QUEUE_LIMIT', 10, 10),
+                   retained=setting('RASTERPILOT_RETAINED_JOBS', 20, 20),
                    quota=setting('RASTERPILOT_STORAGE_MIB', 1024, 1024, 32) * 1024 ** 2)
 
-    def __init__(self, root, *, ttl=3600, capacity=4, retained=8, quota=1024 ** 3):
+    def __init__(self, root, *, ttl=3600, capacity=10, retained=20, quota=1024 ** 3):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.ttl, self.capacity, self.retained, self.quota = ttl, capacity, retained, quota
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             db.execute('''CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY, owner TEXT NOT NULL, state TEXT NOT NULL,
                 created REAL NOT NULL, updated REAL NOT NULL, parameters TEXT NOT NULL,
                 filename TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
                 reserved INTEGER NOT NULL, error TEXT)''')
+            # Zusatztabelle erhält das bisherige jobs-Schema für Update-Rückfälle.
+            db.execute('''CREATE TABLE IF NOT EXISTS job_metadata (
+                job_id TEXT PRIMARY KEY, original_name TEXT NOT NULL)''')
             db.execute('CREATE TABLE IF NOT EXISTS worker (id INTEGER PRIMARY KEY, heartbeat REAL NOT NULL)')
 
     @contextmanager
@@ -59,7 +63,7 @@ class JobStore:
         # IDs stammen ausschließlich aus selbst erzeugten Datenbankeinträgen.
         return self.root / (job_id + suffix)
 
-    def enqueue(self, owner, source, parameters, filename, size):
+    def enqueue(self, owner, source, parameters, filename, size, original_name=''):
         now = time.time()
         job_id = secrets.token_hex(16)
         reserve = len(source) + size[0] * size[1] * 5 + 1024 ** 2
@@ -76,15 +80,17 @@ class JobStore:
                         pass
             promised = max(0, sum(row['reserved'] for row in rows) - used)
             if (len(active) >= self.capacity or len(rows) >= self.retained or
-                    any(row['owner'] == owner for row in active) or
                     sum(row['reserved'] for row in rows) + reserve > self.quota or
                     shutil.disk_usage(self.root).free < reserve + promised):
-                raise QueueFull('Die Warteschlange oder der temporäre Speicher ist voll, oder für diesen Browser läuft bereits ein Auftrag. Bitte später erneut versuchen.')
+                raise QueueFull('Die Warteschlange oder der temporäre Speicher ist voll. Bitte fertige Aufträge entfernen oder später erneut versuchen.')
             try:
                 with self.path(job_id, '.input').open('xb') as stream:
                     stream.write(source)
-                db.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                db.execute('''INSERT INTO jobs
+                    (id,owner,state,created,updated,parameters,filename,width,height,reserved,error)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
                     (job_id, owner, 'queued', now, now, parameters, filename, *size, reserve, None))
+                db.execute('INSERT INTO job_metadata VALUES (?,?)', (job_id, original_name))
             except BaseException:
                 self.path(job_id, '.input').unlink(missing_ok=True)
                 raise
@@ -92,8 +98,23 @@ class JobStore:
 
     def get(self, job_id, owner):
         with self.connect() as db:
-            return db.execute('SELECT * FROM jobs WHERE id=? AND owner=? AND updated>?',
+            return db.execute('''SELECT jobs.*, COALESCE(job_metadata.original_name, '') AS original_name
+                              FROM jobs LEFT JOIN job_metadata ON jobs.id=job_metadata.job_id
+                              WHERE id=? AND owner=? AND updated>?''',
                               (job_id, owner, time.time() - self.ttl)).fetchone()
+
+    def listing(self, owner):
+        with self.connect() as db:
+            rows = db.execute('''SELECT jobs.*, COALESCE(job_metadata.original_name, '') AS original_name
+                              FROM jobs LEFT JOIN job_metadata ON jobs.id=job_metadata.job_id
+                              WHERE updated>? ORDER BY created,id''',
+                              (time.time() - self.ttl,)).fetchall()
+        active = [row for row in rows if row['state'] in ('queued', 'running')]
+        positions = {row['id']: index + 1 for index, row in enumerate(active)}
+        own = [dict(row) | {'position': positions.get(row['id']),
+                           'expires_at': row['updated'] + self.ttl}
+               for row in rows if row['owner'] == owner]
+        return own, len(active), sum(row['state'] == 'running' for row in active)
 
     def claim(self):
         with self.connect() as db:
@@ -168,6 +189,7 @@ class JobStore:
                 except PermissionError:
                     continue  # Ein laufender Windows-Download hält die Datei noch offen.
                 db.execute('DELETE FROM jobs WHERE id=?', (row['id'],))
+            db.execute('DELETE FROM job_metadata WHERE job_id NOT IN (SELECT id FROM jobs)')
             known = {row['id'] for row in db.execute('SELECT id FROM jobs')}
             for path in self.root.iterdir():
                 if re.fullmatch(r'[a-f0-9]{32}\.(input|part|png)', path.name) and path.stem not in known:

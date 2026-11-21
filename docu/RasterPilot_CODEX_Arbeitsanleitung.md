@@ -179,6 +179,8 @@ Uploadgröße, dekodierte Pixelanzahl, Zielpixelzahl, Laufzeit und Warteschlange
 
 Dateien anhand interner zufälliger IDs zuordnen, nicht anhand übergebener Pfade. Downloads nur dem zugehörigen Browserzugang ermöglichen. Zufällige Job-IDs allein nicht als Zugriffsschutz betrachten. Sitzungszuordnung und sichere Cookies vorsehen; destruktive Aktionen und Upload-Endpunkte passend gegen CSRF absichern.
 
+Auf Anwenderwunsch bis zu zehn aktive/wartende Aufträge global und mehrere je Browserprofil erlauben; weiterhin nur einen gleichzeitig berechnen. Bis zu 20 Aufträge unter bestehender Speicherquote aufbewahren. Unter der Vorschau eigene Originaldateinamen, Zustand und Warteposition anzeigen; fremde Aufträge nur in anonymen Zählern berücksichtigen. Fertige Ergebnisse bis zum Ablauf auch nach Neuladen anzeigen und herunterladen können. Angenommene Aufträge bei Bild-/Einstellungswechsel nicht abbrechen und Ergebnisse nicht löschen; Abbruch/Entfernen erfolgt ausdrücklich je Auftrag. Originaldateinamen ohne Pfad ausschließlich als Text darstellen.
+
 Temporäre Dateien und Jobs automatisch nach einer konfigurierbaren Frist löschen. Löschung und Export dürfen nicht kollidieren. Keine Bilder oder vollständigen lokalen Pfade in Logs schreiben. Keine externen Bilddienste verwenden.
 
 ## 9. Prüfungen und Abnahmekriterien

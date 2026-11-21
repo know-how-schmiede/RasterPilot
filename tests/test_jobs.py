@@ -30,16 +30,16 @@ class JobsTest(unittest.TestCase):
     def enqueue(self, owner='a'):
         return self.store.enqueue(owner, self.source, json.dumps(self.values), 'original_rp_25.4_64ppi_30G.png', (64, 32))
 
-    def test_atomic_queue_capacity_and_per_owner_limit(self):
+    def test_atomic_queue_capacity_includes_multiple_jobs_of_the_same_owner(self):
         def submit(index):
             try:
-                return self.enqueue(str(index))['id']
+                return self.enqueue()['id']
             except QueueFull:
                 return None
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            ids = list(pool.map(submit, range(8)))
-        self.assertEqual(len([value for value in ids if value]), 4)
-        self.assertEqual(len(list(self.store.root.glob('*.input'))), 4)
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            ids = list(pool.map(submit, range(16)))
+        self.assertEqual(len([value for value in ids if value]), 10)
+        self.assertEqual(len(list(self.store.root.glob('*.input'))), 10)
         self.store = JobStore(self.temp.name, quota=1)
         with self.assertRaises(QueueFull):
             self.enqueue('new')
@@ -49,7 +49,8 @@ class JobsTest(unittest.TestCase):
             configured = JobStore.configured(self.temp.name)
             self.assertEqual(configured.capacity, 2)
             self.assertEqual(configured.quota, 512 * 1024 ** 2)
-        for changes in ({'RASTERPILOT_QUEUE_LIMIT': '0'}, {'RASTERPILOT_JOB_TTL': '59'},
+        for changes in ({'RASTERPILOT_QUEUE_LIMIT': '0'}, {'RASTERPILOT_QUEUE_LIMIT': '11'},
+                        {'RASTERPILOT_RETAINED_JOBS': '21'}, {'RASTERPILOT_JOB_TTL': '59'},
                         {'RASTERPILOT_STORAGE_MIB': '1025'}, {'RASTERPILOT_RETAINED_JOBS': 'invalid'}):
             with self.subTest(changes=changes), patch.dict('os.environ', changes), self.assertRaises(ValueError):
                 JobStore.configured(self.temp.name)
@@ -69,11 +70,9 @@ class JobsTest(unittest.TestCase):
         self.assertFalse(self.store.path(job['id'], '.input').exists())
         self.assertFalse(self.store.path(job['id'], '.png').exists())
 
-    def test_owner_limit_and_fifo(self):
+    def test_multiple_own_jobs_keep_fifo_order(self):
         first = self.enqueue()
-        with self.assertRaises(QueueFull):
-            self.enqueue()
-        second = self.enqueue('b')
+        second = self.enqueue()
         self.assertEqual(self.store.claim()['id'], first['id'])
         self.assertEqual(self.store.claim()['id'], second['id'])
 
@@ -137,6 +136,72 @@ class JobsTest(unittest.TestCase):
             secrets = list(pool.map(lambda _: shared_secret(self.store.root), range(4)))
         self.assertTrue(all(value == secrets[0] and len(value) == 32 for value in secrets))
 
+    def test_original_name_metadata_preserves_old_schema_and_is_cleaned(self):
+        now = time.time()
+        old_id = 'e' * 32
+        with self.store.connect() as db:
+            # Der INSERT der vorherigen Version muss nach der Erweiterung funktionieren.
+            db.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                       (old_id, 'a', 'done', now, now, '{}', 'old.png', 1, 1, 0, None))
+        migrated = JobStore(self.temp.name)
+        self.assertEqual(migrated.get(old_id, 'a')['original_name'], '')
+        job = migrated.enqueue('a', self.source, json.dumps(self.values), 'out.png', (64, 32),
+                               original_name='Eichhörnchen.original.jpg')
+        self.assertEqual(migrated.get(job['id'], 'a')['original_name'], 'Eichhörnchen.original.jpg')
+        with migrated.connect() as db:
+            db.execute('UPDATE jobs SET updated=0')
+        migrated.cleanup()
+        with migrated.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM job_metadata').fetchone()[0], 0)
+
+    def test_api_list_is_private_with_global_counts_and_completed_downloads(self):
+        app = create_app({'DATA_DIR': self.temp.name, 'SECRET_KEY': 'test'})
+        a, b = app.test_client(), app.test_client()
+        headers = {'X-RasterPilot-Request': '1'}
+        self.store.heartbeat()
+        def submit(client, name):
+            return client.post('/api/jobs', data={'image': (BytesIO(self.source), name.replace('\\', '\\\\')),
+                               'parameters': json.dumps(self.values)}, headers=headers)
+        first = submit(a, r'C:\privat\Eichhörnchen.original.png')
+        foreign = submit(b, 'fremdes-bild.png')
+        own = a.get('/api/jobs', headers=headers)
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(own.headers['Cache-Control'], 'no-store')
+        self.assertEqual(own.json['capacity'], 10)
+        self.assertEqual(own.json['active'], 2)
+        self.assertEqual(len(own.json['jobs']), 1)
+        self.assertEqual(own.json['jobs'][0]['original_name'], 'Eichhörnchen.original.png')
+        self.assertNotIn('privat', own.get_data(as_text=True))
+        self.assertNotIn(foreign.json['id'], own.get_data(as_text=True))
+        self.assertNotIn('fremdes-bild', own.get_data(as_text=True))
+        self.assertNotIn('parameters', own.json['jobs'][0])
+        self.assertEqual(b.get('/api/jobs', headers=headers).json['jobs'][0]['position'], 2)
+        self.assertEqual(a.get('/api/jobs').status_code, 403)
+        self.assertEqual(a.get('/api/jobs', headers={**headers, 'Origin': 'https://foreign.example'}).status_code, 403)
+        process_one(self.store)
+        later = submit(a, 'zweites.png')
+        rows = a.get('/api/jobs', headers=headers).json['jobs']
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['state'], 'done')
+        self.assertGreater(rows[0]['expires_at'], time.time())
+        response = a.get(f'/api/jobs/{first.json["id"]}/result', headers=headers, buffered=True)
+        self.assertEqual(response.status_code, 200)
+        response.close()
+        self.assertEqual(b.get(f'/api/jobs/{first.json["id"]}/result', headers=headers).status_code, 404)
+        a.delete(f'/api/jobs/{first.json["id"]}', headers=headers)
+        self.assertEqual([row['id'] for row in a.get('/api/jobs', headers=headers).json['jobs']], [later.json['id']])
+
+    def test_one_browser_can_fill_ten_queue_places_and_eleventh_is_rejected(self):
+        app = create_app({'DATA_DIR': self.temp.name, 'SECRET_KEY': 'test'})
+        client = app.test_client()
+        headers = {'X-RasterPilot-Request': '1'}
+        self.store.heartbeat()
+        for index in range(11):
+            response = client.post('/api/jobs', data={'image': (BytesIO(self.source), f'motiv-{index}.png'),
+                                   'parameters': json.dumps(self.values)}, headers=headers)
+            self.assertEqual(response.status_code, 202 if index < 10 else 429)
+        self.assertEqual(len(client.get('/api/jobs', headers=headers).json['jobs']), 10)
+
     def test_multiple_web_processes_share_cookie_identity_and_queue_limit(self):
         app_a = create_app({'DATA_DIR': self.temp.name})
         app_b = create_app({'DATA_DIR': self.temp.name})
@@ -152,9 +217,11 @@ class JobsTest(unittest.TestCase):
         job_id = response.json['id']
         self.assertEqual(b.get(f'/api/jobs/{job_id}', headers=headers).status_code, 200)
         self.assertEqual(b.get(f'/api/jobs/{job_id}/result', headers=headers).status_code, 409)
-        self.assertEqual(b.post('/api/jobs', data=data(), headers=headers).status_code, 429)
+        second = b.post('/api/jobs', data=data(), headers=headers)
+        self.assertEqual(second.status_code, 202)
         self.assertEqual(b.delete(f'/api/jobs/{job_id}', headers=headers).status_code, 200)
         self.assertEqual(self.store.state(job_id), 'cancelled')
+        self.assertEqual(b.delete(f'/api/jobs/{second.json["id"]}', headers=headers).status_code, 200)
 
     def test_api_sessions_readiness_and_worker_is_a_separate_process(self):
         app = create_app({'DATA_DIR': self.temp.name, 'SECRET_KEY': 'test'})

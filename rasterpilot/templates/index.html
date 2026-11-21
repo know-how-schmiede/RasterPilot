@@ -5,6 +5,7 @@
   <title>RasterPilot – Raster und PNG-Export</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version) }}">
   <script src="{{ url_for('static', filename='settings.js', v=version) }}" defer></script>
+  <script src="{{ url_for('static', filename='jobs.js', v=version) }}" defer></script>
   <script src="{{ url_for('static', filename='app.js', v=version) }}" defer></script>
 </head>
 <body>
@@ -61,12 +62,20 @@
     <div class="preview-head"><h2>Vorschau</h2><span id="renderState">Noch kein aktuelles Raster</span></div>
     <fieldset id="viewSettings" class="view-settings" disabled><legend>Ansicht</legend>
       <div class="view-controls">
-      <label>Vergleich <select id="view"><option value="original">Originalbild</option><option id="resultOption" value="result" disabled>Rasterergebnis</option></select></label>
+      <label>Vergleich <select id="view"><option id="originalOption" value="original">Originalbild</option><option id="resultOption" value="result" disabled>Rasterergebnis</option></select></label>
       <label>Zoom <select id="zoom" disabled><option value="fit">Einpassen</option><option value="actual">100 % · Exportpixel prüfen</option></select></label>
       <label>Hintergrund <select id="background"><option value="textile">Textilfarbe</option><option value="checker">Transparenzraster</option></select></label>
       <label>Textilfarbe <input id="color" type="color" value="#233246"></label>
       </div>
     </fieldset>
-    <div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du das Bild durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p></section></div>
+    <div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du das Bild durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p>
+    <section class="job-list" aria-label="Eigene Aufträge">
+      <h2>Deine Aufträge</h2>
+      <p id="queueSummary" class="hint" aria-live="polite">Warteschlange wird geladen …</p>
+      <p id="jobsMessage" role="status"></p>
+      <p id="jobsEmpty" class="hint">Noch keine eigenen Aufträge vorhanden.</p>
+      <div class="jobs-scroll"><table id="jobsTable" hidden><thead><tr><th>Originalbild</th><th>Status</th><th>Aktionen</th></tr></thead><tbody id="jobRows"></tbody></table></div>
+      <p class="hint">Nur Aufträge dieses Browserprofils. Fertige Ergebnisse bleiben bis zum angezeigten Ablaufzeitpunkt verfügbar – auch nach Neuladen. „Entfernen“ gibt den Speicher frei. Bild- und Einstellungswechsel lassen angenommene Aufträge weiterlaufen.</p>
+    </section></section></div>
 </main><footer class="wrap">RasterPilot · Druckmaße im RIP prüfen und vor der Produktion einen Testdruck durchführen.</footer>
 </body></html>

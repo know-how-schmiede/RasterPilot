@@ -156,6 +156,26 @@ class ImageApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 413)
         self.assertIn('error', response.json)
 
+    def test_affinity_settings_survive_queue_and_worker_with_original_colors(self):
+        data = self.data(mode='affinity', mask_contrast=0, levels_blend='vivid_light',
+                         bw_red=140, bw_blue=80, white_point=184, angle_deg=45)
+        with Image.new('RGBA', (256, 128), (160, 180, 200, 128)) as source:
+            source.paste((255, 255, 255, 0), (0, 0, 128, 128))
+            data['image'] = (encoded(source, format='PNG'), 'farben.png')
+        response = self.render(data=data)
+        self.assertEqual(response.status_code, 200)
+        with Image.open(BytesIO(response.data)) as result:
+            array = np.array(result)
+            self.assertEqual(result.size, (256, 128))
+            self.assertAlmostEqual(result.info['dpi'][0], 256, delta=0.02)
+            self.assertTrue(np.all(array[:, :128, 3] == 0))
+            visible = array[:, 128:, 3] == 255
+            self.assertGreater(visible.mean(), 0)
+            self.assertLess(visible.mean(), 1)
+            self.assertTrue(np.all(array[:, 128:][visible, :3] == [160, 180, 200]))
+            self.assertLessEqual(set(np.unique(array[:, :, 3])), {0, 255})
+        response.close()
+
     def test_file_over_one_mib_is_streamed_despite_small_form_memory_limit(self):
         pixels = np.random.default_rng(1).integers(0, 256, (700, 700, 3), dtype=np.uint8)
         with Image.fromarray(pixels) as image:

@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const ctx = vm.createContext({});
 vm.runInContext(readFileSync('rasterpilot/static/settings.js', 'utf8'), ctx);
 const settings = ctx.RasterPilotSettings;
-const example = () => ({ format: 'RasterPilot', version: 1,
+const example = () => ({ format: 'RasterPilot', version: 2,
   settings: { ...settings.defaults }, view: { ...settings.viewDefaults } });
 
 test('JSON-Rundlauf erh채lt alle Druck-, Raster- und Ansichtswerte ohne Bilder', () => {
@@ -20,7 +20,7 @@ test('JSON-Rundlauf erh채lt alle Druck-, Raster- und Ansichtswerte ohne Bilder',
 });
 
 test('Besch채digte, unbekannte oder unvollst채ndige Formate werden verworfen', () => {
-  for (const data of [null, [], {}, { ...example(), version: 2 }, { ...example(), settings: {} },
+  for (const data of [null, [], {}, { ...example(), version: 3 }, { ...example(), settings: {} },
     { ...example(), view: { ...settings.viewDefaults, filename: 'x' } }]) {
     assert.throws(() => settings.validate(data));
   }
@@ -40,5 +40,25 @@ test('Wertebereiche, Typen, Tonwerte und Abtastgrenze werden vor Anwendung gepr�
     const data = example();
     Object.assign(data.view, change);
     assert.throws(() => settings.validate(data));
+  }
+});
+
+test('Affinity-Einstellungen 체berstehen den Rundlauf; Version 1 erh채lt neutrale Zusatzwerte', () => {
+  const data = example();
+  Object.assign(data.settings, { mode: 'affinity', spacing_mm: 1.471, white_point: 184,
+    mask_contrast: 85, levels_blend: 'vivid_light', bw_red: 150, bw_cyan: 40 });
+  assert.deepEqual(JSON.parse(settings.serialize(data.settings, data.view)), data);
+  const legacy = example();
+  legacy.version = 1;
+  for (const key of Object.keys(legacy.settings)) {
+    if (key.startsWith('bw_') || ['mask_contrast', 'levels_blend'].includes(key)) delete legacy.settings[key];
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(settings.validate(legacy))), example());
+  assert.equal(legacy.version, 1);
+  legacy.settings.mode = 'affinity';
+  assert.throws(() => settings.validate(legacy));
+  for (const change of [{ bw_red: -1 }, { bw_cyan: 201 }, { bw_blue: 100.5 },
+    { mask_contrast: 101 }, { mask_contrast: true }, { levels_blend: 'other' }, { spacing_mm: 1.0001 }]) {
+    assert.throws(() => settings.validate({ ...data, settings: { ...data.settings, ...change } }));
   }
 });

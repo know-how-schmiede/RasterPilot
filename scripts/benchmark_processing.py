@@ -46,7 +46,7 @@ def main():
                         help='Kantenlänge des synthetischen Originals (Standard: 2400 Pixel).')
     parser.add_argument('--pattern', choices=('noise', 'gradient'), default='noise',
                         help='Rauschen für PNG-Kompression oder Verlauf für große dekodierte Eingaben.')
-    parser.add_argument('--mode', choices=('color', 'luminance', 'alpha'), default='color',
+    parser.add_argument('--mode', choices=('color', 'luminance', 'alpha', 'affinity'), default='color',
                         help='Rastermodus (Standard: color).')
     args = parser.parse_args()
     if args.source_side < 1 or args.source_side ** 2 > 40_000_000:

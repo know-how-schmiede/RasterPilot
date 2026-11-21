@@ -22,22 +22,36 @@ Die Exportgrenze bezieht sich auf die berechneten Druckmaße, nicht auf die Date
 
 ## 3. Raster berechnen
 
-Unter „Rastermodus“ stehen drei Verfahren zur Wahl:
+Unter „Rastermodus“ stehen vier Verfahren zur Wahl:
 
 - **Farbig auflockern:** Die bisherige Vorgabe. Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken; Weiß wird nicht automatisch freigestellt.
+- **Farbig nach Helligkeit · Affinity:** Der Ablauf aus dem Handout erzeugt eine Helligkeitsmaske und wendet das runde Raster auf die Originalfarben an. Helle Bildstellen erzeugen mehr Druckfläche, dunkle werden transparent. „Helligkeit umkehren“ kehrt die Maske um. Tonwerte, Maskenkontrast und sechs Schwarz-Weiß-Farbregler betreffen ausschließlich die Maske. Das Original bleibt als Farbquelle erhalten. Einzelheiten und Beispielvorgabe siehe unten.
 - **Einfarbig nach Helligkeit:** Dunkle Bildstellen erzeugen mehr Druckfläche, helle weniger. „Druckfarbe“ bestimmt die Farbe aller Punkte, unabhängig von der Textilfarbe der Ansicht. Schwarz wird bei neutralen Tonwerten gefüllt, Weiß transparent. „Helligkeit umkehren“ kehrt diese Zuordnung um, beispielsweise für helle Druckfarbe auf dunklem Textil. Vorhandene Transparenz wird weiterhin berücksichtigt.
 - **Transparenz rastern:** Weiche Transparenz wird in deckende Punkte und transparente Lücken umgewandelt. Vollständig transparente Stellen bleiben leer, deckende Innenbereiche bleiben gefüllt. Bildfarben bleiben erhalten. Ohne vorhandene Transparenz entstehen keine Lücken. Die Deckung aus dem Farbmodus wird hier nicht zusätzlich angewendet.
 
-Im Helligkeitsmodus öffnet „Erweitert · Tonwerte“ die manuelle Korrektur der Helligkeitsmaske:
+Im einfarbigen und im Affinity-Modus öffnet „Erweitert · Tonwerte“ die manuelle Korrektur der Helligkeitsmaske. Die folgenden Richtungsangaben gelten für den einfarbigen Modus ohne Umkehr; im Affinity-Modus ist die Wirkung umgekehrt:
 
 - **Schwarzpunkt (0–254):** Helligkeiten bis zu diesem Wert gelten als Schwarz. Höhere Werte vergrößern im normalen Modus die Druckfläche.
 - **Weißpunkt (1–255):** Helligkeiten ab diesem Wert gelten als Weiß. Niedrigere Werte verringern im normalen Modus die Druckfläche. Schwarzpunkt muss kleiner als Weißpunkt sein.
 - **Gamma (0,1–5):** Verändert die mittleren Tonwerte. Über 1 entsteht im normalen Modus weniger Druckfläche, unter 1 mehr. Bei Umkehr gilt die umgekehrte Wirkung.
 - **Tonwerte zurücksetzen:** Stellt Schwarzpunkt 0, Weißpunkt 255 und Gamma 1 wieder her.
 
-Die Tonwerte verändern ausschließlich die Helligkeitsmaske im einfarbigen Modus. Originalvergleich und andere Modi behalten ihre Farben. Automatische Tonwerte und Entrauschung sind noch nicht implementiert.
+Die Tonwerte verändern ausschließlich die Helligkeitsmaske. Im Affinity-Modus erfolgt die Feinabstimmung am Arbeitsraster vor der Lichterauswahl, entsprechend Schritt 5 nach dem Zusammenlegen des Halbtonfilters im Handout. Originalvergleich und farbige Ergebnisse behalten ihre Farben. Automatische Tonwerte und Entrauschung sind noch nicht implementiert.
 
-- **Rasterabstand in mm:** Abstand der Punktmittelpunkte, kein Punktdurchmesser. Mindestens zwei Ausgabepixel Abstand sind erforderlich; das ist eine technische Abtastgrenze und keine geprüfte Mindestdruckgröße.
+### Ablauf nach dem Affinity-Handout
+
+1. „Farbig nach Helligkeit · Affinity“ auswählen. RasterPilot berechnet intern eine Arbeitskopie: Schwarz-Weiß → rundes Halbtonraster → Tonwerte abstimmen → Lichter als Maske auf dem Farboriginal. Die erste Tonwertkorrektur des Handouts ist neutral; die spätere Abstimmung nach dem Halbtonfilter ist hier einstellbar. Das manuelle Duplizieren, Zusammenlegen, Rastern und Ziehen von Ebenen entfällt.
+2. Bei Bedarf **„Handout-Beispiel übernehmen“** anklicken. Das setzt 45°, Maskenkontrast 85, Schwarzpunkt 0, Weißpunkt 184 (ungefähr 72 %), Gamma 1, Mischmodus „Strahlendes Licht“ und alle sechs Farbregler auf 100 %. Der Rasterabstand entspricht 10 Pixeln bei der Referenzbreite 1904 Pixel aus dem Handout: bei 28 cm Druckbreite **1,471 mm**. Bei 300 ppi sind das etwa 17,37 Ausgabepixel. Die Vorgabe wird auf die aktuelle Druckbreite übertragen, unabhängig von der Pixelzahl des importierten Originals. Bei sehr kleinen Ausgaben hebt RasterPilot den Abstand auf mindestens zwei Pixel an und meldet das. Nach der Übernahme bleibt der mm-Abstand fest; bei geänderter Druckbreite die Vorgabe gegebenenfalls erneut übernehmen.
+3. **Maskenkontrast (0–100):** Höhere Werte schärfen das Arbeitsraster vor der Lichterauswahl. Der Regler verändert dadurch die Wirkung der anschließenden Tonwertkorrektur. Bei neutralen Tonwerten bleibt die binäre Exportmaske gleich. Die Exportpunkte sind immer vollständig deckend oder transparent. Dies ist RasterPilots eigene Kontrastberechnung; Affinitys Filter und Regler werden nicht pixelgleich nachgebildet.
+4. Unter **„Erweitert · Schwarz-Weiß und Mischmodus“** bei Bedarf „Normal“ statt „Strahlendes Licht“ wählen. „Strahlendes Licht“ verstärkt die Wirkung der Tonwertkorrektur und kann Details verlieren. Rot, Gelb, Grün, Cyan, Blau und Magenta steuern die Helligkeit des jeweiligen Farbbereichs in der Maske: 100 % neutral, kleinere Werte dunkler, größere heller. Grautöne bleiben davon unberührt. Die gedruckten Farben werden dadurch nicht umgefärbt.
+5. Raster berechnen und auf schwarzer beziehungsweise gewünschter Textilfarbe prüfen. Standardmäßig sind die **Lichter sichtbar**. Falls die falschen Motivbereiche ausgespart werden, „Helligkeit umkehren“ aktivieren und neu berechnen. Feine Punkte und Lücken zusätzlich bei 100 % prüfen.
+6. Einstellungen als JSON und das Original separat aufbewahren, um weiterarbeiten zu können. Die Druckdatei als PNG herunterladen. RasterPilot exportiert ausschließlich das maskierte Farbbild; es gibt keine ausgeblendeten Hintergrund- oder Testebenen im PNG. Wird das Ergebnis anschließend in Affinity weiterbearbeitet, gilt der Handout-Hinweis weiterhin: in einer separaten Druckkopie alle ausgeblendeten Ebenen und Testhintergründe löschen und die Exporttransparenz prüfen.
+
+Die Handout-Werte sind ein Startpunkt für das dort gezeigte Motiv. RasterPilot verwendet eine dokumentierte Annäherung an die Maskenerstellung; die [Architektur](ARCHITEKTUR.md#erweiterung-050-farbige-helligkeitsmaske-nach-dem-affinity-handout) erklärt die Formeln und Grenzen. Druckprofil und Probedruck bleiben erforderlich.
+
+### Gemeinsame Rastereinstellungen
+
+- **Rasterabstand in mm:** Abstand der Punktmittelpunkte, kein Punktdurchmesser. Einstellbar in Schritten von 0,001 mm. Mindestens zwei Ausgabepixel Abstand sind erforderlich; das ist eine technische Abtastgrenze und keine geprüfte Mindestdruckgröße.
 - **Rasterwinkel in °:** Von −180° bis +180°, Vorgabe 0°. Positive Winkel drehen das Punktraster im Uhrzeigersinn um die linke obere Bildkante. Beispielsweise erzeugt 45° ein diagonales Raster. Das Motiv selbst wird weder gedreht noch beschnitten; Pixelmaße und Rasterabstand bleiben gleich.
 - **Deckung in % (nur Farbig auflockern):** Mehr Deckung bedeutet mehr bedruckte Fläche. 0 % ergibt ein leeres Bild; 100 % füllt vollständig deckende Motivbereiche. Weiche Transparenz reduziert die lokale Punktfläche. Der exportierte Alphakanal bleibt in allen Modi binär.
 - **Raster berechnen:** Überträgt das Original mit den Einstellungen erneut an den Server und erstellt das endgültige PNG. Änderungen an Druckgröße, Rastermodus, Rasterabstand, Winkel, Deckung, Druckfarbe, Umkehrung oder Tonwerten entwerten das bisherige Ergebnis; danach erneut berechnen.
@@ -64,7 +78,7 @@ Das Dateinamensschema bleibt in allen Modi gleich. Modus, Druckfarbe und Tonwert
 
 ## 5. Einstellungen speichern und laden
 
-Über „Einstellungen speichern und laden“ oberhalb der Bildauswahl eine JSON-Datei speichern oder öffnen. Die Datei enthält Druckmaße, Auflösung, Rastermodus, Abstand, Winkel, Deckung, Druckfarbe, Umkehrung, Tonwerte sowie Hintergrund, Textilfarbe und Zoom. Sie enthält weder Bilddaten noch Server-Aufträge oder Dateipfade und kann auch ohne gewähltes Bild verwendet werden.
+Über „Einstellungen speichern und laden“ oberhalb der Bildauswahl eine JSON-Datei speichern oder öffnen. Die Datei enthält Druckmaße, Auflösung, Rastermodus, Abstand, Winkel, Deckung, Druckfarbe, Umkehrung, Tonwerte, Maskenkontrast, Mischmodus und sechs Schwarz-Weiß-Farbregler sowie Hintergrund, Textilfarbe und Zoom. Neue Dateien verwenden Formatversion 2; vollständige Dateien der Version 1 bleiben ladbar und erhalten Vorgabewerte für die zusätzlichen Felder. Neue Dateien benötigen RasterPilot ab 0.5.0. Sie enthalten weder Bilddaten noch Server-Aufträge oder Dateipfade und können auch ohne gewähltes Bild verwendet werden.
 
 Beim Laden wird die ganze Datei geprüft, bevor Werte übernommen werden. Beschädigte Dateien, unbekannte Versionen, unzulässige Werte und Dateien über 64 KiB werden abgewiesen; die bisherigen Einstellungen und ein vorhandenes Ergebnis bleiben dabei erhalten. Nach erfolgreichem Laden das Raster neu berechnen. Ein Originalbild muss bei Bedarf erneut ausgewählt werden. Die Ansicht startet nach dem Laden beim Original; ein gespeicherter Zoom wird für das nächste Ergebnis übernommen.
 

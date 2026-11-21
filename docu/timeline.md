@@ -1,5 +1,15 @@
 # Timeline
 
+## 0.5.0 – 21. November 2026
+
+- Rasterprozess um „Farbig nach Helligkeit · Affinity“ nach dem bereitgestellten Handout erweitert. Schwarz-Weiß-Arbeitskopie und rundes Halbtonraster erzeugen eine Lichtermaske für die Originalfarben, optional invertiert. Vorhandene Transparenz wird einmal berücksichtigt; der PNG-Export behält binäres Alpha, sRGB und ppi-Metadaten.
+- Sechs Schwarz-Weiß-Farbregler, Maskenkontrast und „Normal“/„Strahlendes Licht“ ergänzt. Die Tonwert-Feinabstimmung erfolgt entsprechend Schritt 5 des Handouts am Arbeitsraster nach dem Halbtonfilter. Hoher Kontrast schärft die Rasterübergänge, ohne die Motivhelligkeit hart abzuschneiden. Affinity-Filter, Farbregler und Lichterauswahl werden nachvollziehbar angenähert, keine pixelgleiche Ausgabe behauptet. Formeln und Abweichungen in der Architektur beschrieben.
+- „Handout-Beispiel übernehmen“ setzt 45°, Kontrast 85, Weißpunkt 184 (rund 72 %), Strahlendes Licht und neutrale Farbregler. Zellengröße 10 bei Referenzbreite 1904 Pixel wird auf die aktuelle Druckbreite übertragen; bei 28 cm ergeben sich 1,471 mm. Rasterabstand nun in 0,001-mm-Schritten einstellbar, die technische Zwei-Pixel-Grenze bleibt erhalten.
+- JSON-Formatversion 2 enthält die zusätzlichen Einstellungen. Vollständige Dateien der Version 1 bleiben importierbar. Änderungen der neuen Felder entwerten veraltete Ergebnisse; die bisherigen drei Modi behalten ihr Verhalten.
+- 55 unterschiedliche Python-Tests und 23 JavaScript-Tests erfolgreich (Gesamtlauf zunächst 54 Python-Tests, anschließend alle 30 Verarbeitungstests einschließlich zusätzlichem Regressionstest). Abgedeckt sind Maskenrichtung, sechs Farbregler, neutrale Grautöne, Tonwerte/Gamma, beide Vivid-Light-Zweige, Erhalt von Mitteltönen, Originalfarben und Alpha, bisherige Modi, Queue/Worker, Einstellungsrundlauf, Migration und Handout-Abstand.
+- Handout-Vorgabe am vorhandenen 1904-×-2544-Pixel-Original lokal geprüft: Ausgabe 3307 × 4419 Pixel, 299,9994 ppi, Alpha ausschließlich 0/255, etwa 3,36 s einschließlich PNG-Dekodierung und Aufbau der Vergleichstafel. Ausgabe auf Schwarz und Exportausschnitt bei 100 % visuell geprüft. Browserprüfung wegen nicht verfügbarem Browserzugriff nicht möglich; Anwender-, Debian- und Druckabnahme bleiben offen.
+- Synthetischer Standardbenchmark `--mode affinity` lokal unter Windows 11/Python 3.12.15: 2400 × 2400 Eingabe, 3307 × 3307 Ausgabe bei 28 cm/300 ppi, etwa 2,72 s und 199,6 MiB Prozessspeicherspitze. Benchmark lief parallel zu Softwaretests; keine LXC-Lastmessung. Keine neuen Abhängigkeiten oder geänderten Installations-/Updateskripte; Installationsvoraussetzungen und beide Installationsdokumente auf Aktualisierungsbedarf geprüft, unverändert gültig.
+
 ## 0.4.0 – 19. November 2026
 
 - Anwender bestätigt die Rastermodi aus 0.3.0 und beauftragt die nächste Entwicklungsstufe zur Betriebsfähigkeit.

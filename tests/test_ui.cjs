@@ -15,12 +15,13 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   downloadName = 'motiv_rp_280_300ppi_0G.png', states = ['done'], queueError = null } = {}) {
   const controls = {};
   const defaults = { width: '28', ppi: '300', angle: '0', mode: 'color', ink: '#000000',
-    black: '0', white: '255', gamma: '1',
+    black: '0', white: '255', gamma: '1', maskContrast: '85', levelsBlend: 'normal',
+    bwRed: '100', bwYellow: '100', bwGreen: '100', bwCyan: '100', bwBlue: '100', bwMagenta: '100',
     spacing: '1', coverage: '65', view: 'original', zoom: 'fit', background: 'textile', color: '#233246' };
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
     'download', 'result', 'renderState', 'resultOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
     'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones', 'cancel',
-    'saveSettings', 'loadSettings', 'presetDownload'];
+    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'affinityControls', 'affinityPreset'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
@@ -342,4 +343,58 @@ test('Fehlender Worker und fehlgeschlagene Aufträge geben keinen Download frei'
     assert.equal(ui.c.cancel.hidden, true);
     assert.ok(ui.c.message.textContent);
   }
+});
+
+test('Affinity-Modus maskiert Originalfarben und übernimmt das skalierte Handout-Beispiel', async () => {
+  const { c, importImage, submitted } = setup({ sourceWidth: 1904, sourceHeight: 2544 });
+  await importImage();
+  c.mode.value = 'affinity'; c.mode.fire('input');
+  assert.equal(c.affinityControls.hidden, false);
+  assert.equal(c.luminanceControls.hidden, false);
+  assert.equal(c.ink.disabled, true);
+  assert.equal(c.coverage.disabled, true);
+  assert.equal(c.white.disabled, false);
+  c.affinityPreset.fire('click');
+  assert.equal(c.white.value, '184');
+  assert.equal(c.spacing.value, '1.471');
+  assert.equal(c.angle.value, '45');
+  assert.equal(c.levelsBlend.value, 'vivid_light');
+  assert.equal(c.invert.checked, false);
+  assert.match(c.message.textContent, /72 %/);
+  await c.render.fire('click');
+  assert.equal(submitted().mode, 'affinity');
+  assert.equal(submitted().white_point, 184);
+  assert.equal(submitted().bw_red, 100);
+  assert.equal(submitted().levels_blend, 'vivid_light');
+  assert.equal(submitted().ink_color, undefined);
+  assert.equal(c.download.hidden, false);
+  c.bwRed.value = '150'; c.bwRed.fire('input');
+  assert.equal(c.download.hidden, true);
+  await c.render.fire('click');
+  assert.equal(submitted().bw_red, 150);
+  c.mode.value = 'color'; c.mode.fire('input');
+  assert.equal(c.affinityControls.hidden, true);
+  assert.equal(c.bwRed.disabled, true);
+});
+
+test('Handout-Abstand berücksichtigt Druckbreite und Abtastgrenze; Affinity-JSON lädt vollständig', async () => {
+  const ui = setup();
+  await ui.importImage();
+  ui.c.mode.value = 'affinity'; ui.c.mode.fire('input');
+  ui.c.width.value = '14'; ui.c.affinityPreset.fire('click');
+  assert.equal(ui.c.spacing.value, '0.735');
+  ui.c.width.value = '0.1'; ui.c.ppi.value = '36'; ui.c.affinityPreset.fire('click');
+  assert.equal(ui.c.spacing.value, '1.412');
+  const data = { format: 'RasterPilot', version: 2,
+    settings: { ...ui.ctx.RasterPilotSettings.defaults, mode: 'affinity', levels_blend: 'vivid_light',
+      spacing_mm: 1.471, mask_contrast: 42, bw_blue: 150, invert: true },
+    view: { ...ui.ctx.RasterPilotSettings.viewDefaults } };
+  ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
+  await ui.c.loadSettings.fire('change');
+  assert.equal(ui.c.bwBlue.value, '150');
+  assert.equal(ui.c.maskContrast.value, '42');
+  assert.equal(ui.c.invert.checked, true);
+  await ui.c.render.fire('click');
+  assert.equal(ui.submitted().bw_blue, 150);
+  assert.equal(ui.submitted().mask_contrast, 42);
 });

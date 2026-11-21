@@ -92,15 +92,27 @@ class Parameters:
     black_point: int = 0
     white_point: int = 255
     gamma: float = 1
+    mask_contrast: int = 85
+    levels_blend: str = 'normal'
+    bw_red: int = 100
+    bw_yellow: int = 100
+    bw_green: int = 100
+    bw_cyan: int = 100
+    bw_blue: int = 100
+    bw_magenta: int = 100
 
     @classmethod
     def from_dict(cls, values, size):
         if not isinstance(values, dict):
             raise ImageError('Die Rastereinstellungen müssen ein JSON-Objekt sein.')
         values = dict(angle_deg=0, mode='color', ink_color='#000000', invert=False,
-                      black_point=0, white_point=255, gamma=1) | values
-        if values['mode'] not in ('color', 'luminance', 'alpha'):
+                      black_point=0, white_point=255, gamma=1, mask_contrast=85,
+                      levels_blend='normal', **{f'bw_{c}': 100 for c in
+                      ('red', 'yellow', 'green', 'cyan', 'blue', 'magenta')}) | values
+        if values['mode'] not in ('color', 'luminance', 'alpha', 'affinity'):
             raise ImageError('Bitte einen gültigen Rastermodus auswählen.')
+        if values['levels_blend'] not in ('normal', 'vivid_light'):
+            raise ImageError('Bitte einen gültigen Mischmodus der Tonwertkorrektur auswählen.')
         if not isinstance(values['ink_color'], str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', values['ink_color']):
             raise ImageError('Die Druckfarbe muss eine Farbe im Format #RRGGBB sein.')
         if not isinstance(values['invert'], bool):
@@ -122,6 +134,10 @@ class Parameters:
             _number(values, 'black_point', 0, 254, True),
             _number(values, 'white_point', 1, 255, True),
             _number(values, 'gamma', 0.1, 5),
+            _number(values, 'mask_contrast', 0, 100, True),
+            values['levels_blend'],
+            *(_number(values, f'bw_{c}', 0, 200, True) for c in
+              ('red', 'yellow', 'green', 'cyan', 'blue', 'magenta')),
         )
         if result.black_point >= result.white_point:
             raise ImageError('Der Schwarzpunkt muss kleiner als der Weißpunkt sein.')
@@ -176,6 +192,62 @@ def _area_rank(distance_squared):
     return np.clip(area, 0, 1)
 
 
+def _affinity_threshold(p):
+    """Lichterschwelle nach Tonwerten/Mischmodus des gerasterten Signals.
+
+    Das Handout stimmt die Tonwerte nach dem Zusammenlegen des Filters ab.
+    Beide Transformationen sind monoton; eine skalare Schwelle genügt daher.
+    """
+    def corrected(value):
+        level = np.clip((value * 255 - p.black_point) /
+                        (p.white_point - p.black_point), 0, 1) ** (1 / p.gamma)
+        if p.levels_blend == 'normal':
+            return level
+        if level < 0.5:
+            return np.clip(1 - (1 - value) / max(2 * level, 1e-12), 0, 1)
+        return np.clip(value / max(2 * (1 - level), 1e-12), 0, 1)
+
+    low, high = 0., 1.
+    for _ in range(48):
+        middle = (low + high) / 2
+        if corrected(middle) < 0.5:
+            low = middle
+        else:
+            high = middle
+    return (low + high) / 2
+
+
+def _affinity_tone(pixels, parameters, threshold):
+    """Arbeitskopie für die Maske; die RGB-Farbquelle bleibt unverändert.
+
+    Dokumentierte Annäherung an den Handout-Ablauf, kein Affinity-Filterklon.
+    """
+    adjusted = pixels[:, :, :3].astype(np.float64) / 255
+    p = parameters
+    red, green, blue = np.moveaxis(adjusted, -1, 0)
+    maximum, minimum = adjusted.max(axis=2), adjusted.min(axis=2)
+    delta = maximum - minimum
+    safe_delta = np.where(delta > 0, delta, 1)
+    hue = np.where(maximum == red, ((green - blue) / safe_delta) % 6,
+                   np.where(maximum == green, (blue - red) / safe_delta + 2,
+                            (red - green) / safe_delta + 4))
+    sector = np.floor(hue).astype(np.intp) % 6
+    fraction = hue - np.floor(hue)
+    gains = np.array([p.bw_red, p.bw_yellow, p.bw_green, p.bw_cyan,
+                      p.bw_blue, p.bw_magenta], dtype=np.float64) / 100
+    gain = gains[sector] * (1 - fraction) + gains[(sector + 1) % 6] * fraction
+    saturation = delta / np.maximum(maximum, 1e-12)
+    brightness = (2126 * red + 7152 * green + 722 * blue) / 10000
+    tone = np.clip(brightness * (1 + saturation * (gain - 1)), 0, 1)
+    # Arbeitsraster H = clip(0,5 + (T - Flächenrang) * Faktor, 0, 1).
+    # Tonwerte/Mischmodus und anschließende Lichterauswahl H > threshold
+    # lassen sich als effektive Deckung ausdrücken. Kontrast schärft so das
+    # Raster statt den Motivtonwert hart abzuschneiden. Endtöne exakt halten.
+    desired = np.clip(tone + (0.5 - threshold) / (1 + p.mask_contrast / 10), 0, 1)
+    desired = np.where(tone <= 0, 0, np.where(tone >= 1, 1, desired))
+    return 1 - desired if p.invert else desired
+
+
 def render_png(image, parameters):
     size = parameters.output_size()
     result = _resize_rgba(image, size)
@@ -185,6 +257,7 @@ def render_png(image, parameters):
     # Pixelmitten in Rasterkoordinaten abbilden. Positive Winkel drehen das
     # Raster im Uhrzeigersinn um die linke obere Bildkante, ohne das Bild zu drehen.
     xx = (np.arange(size[0], dtype=np.float64) + 0.5) / pitch
+    affinity_threshold = _affinity_threshold(parameters) if parameters.mode == 'affinity' else None
     for start in range(0, size[1], 128):
         end = min(start + 128, size[1])
         yy = (np.arange(start, end, dtype=np.float64) + 0.5) / pitch
@@ -197,6 +270,8 @@ def render_png(image, parameters):
         desired = pixels[:, :, 3].astype(np.float64) / 255
         if parameters.mode == 'color':
             desired *= parameters.coverage / 100
+        elif parameters.mode == 'affinity':
+            desired *= _affinity_tone(pixels, parameters, affinity_threshold)
         elif parameters.mode == 'luminance':
             rgb = pixels[:, :, :3].astype(np.float64)
             # Gewichtete sRGB-Helligkeit; Schwarz und Weiß bleiben exakt 0/255.

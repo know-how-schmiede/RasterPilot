@@ -2,6 +2,9 @@
 const $ = id => document.getElementById(id);
 const fields = ['width', 'ppi', 'spacing', 'coverage', 'angle'];
 const toneFields = ['black', 'white', 'gamma'];
+const bwFields = { bw_red: 'bwRed', bw_yellow: 'bwYellow', bw_green: 'bwGreen',
+  bw_cyan: 'bwCyan', bw_blue: 'bwBlue', bw_magenta: 'bwMagenta' };
+const affinityFields = ['maskContrast', ...Object.values(bwFields)];
 let image = null;
 let originalFile = null;
 let sourceWidth = 0;
@@ -53,8 +56,9 @@ function invalidate() {
 function parameters(checkOutput = true) {
   const mode = $('mode').value;
   const activeFields = fields.filter(id => id !== 'coverage' || mode === 'color');
-  if (mode === 'luminance') activeFields.push(...toneFields);
-  const valid = image && ['color', 'luminance', 'alpha'].includes(mode) &&
+  if (['luminance', 'affinity'].includes(mode)) activeFields.push(...toneFields);
+  if (mode === 'affinity') activeFields.push(...affinityFields);
+  const valid = image && ['color', 'luminance', 'alpha', 'affinity'].includes(mode) &&
     activeFields.every(id => $(id).value !== '' && $(id).checkValidity() && Number.isFinite(Number($(id).value))) &&
     Number.isInteger(Number($('ppi').value));
   if (!valid) throw new Error('Bitte gültige Werte für Druckgröße und Raster eingeben.');
@@ -66,12 +70,21 @@ function parameters(checkOutput = true) {
   }
   if (spacing / 25.4 * ppi < 2) throw new Error('Der Rasterabstand muss bei dieser Auflösung mindestens zwei Pixel betragen.');
   const p = { width_cm: width, ppi, spacing_mm: spacing, coverage: mode === 'color' ? coverage : 100, angle_deg: angle, mode };
-  if (mode === 'luminance') {
-    p.ink_color = $('ink').value;
+  if (['luminance', 'affinity'].includes(mode)) {
+    if (mode === 'luminance') p.ink_color = $('ink').value;
     p.invert = $('invert').checked;
     [p.black_point, p.white_point, p.gamma] = toneFields.map(id => Number($(id).value));
     if (!Number.isInteger(p.black_point) || !Number.isInteger(p.white_point) || p.black_point >= p.white_point) {
       throw new Error('Der Schwarzpunkt muss kleiner als der Weißpunkt sein; beide müssen ganze Zahlen sein.');
+    }
+  }
+  if (mode === 'affinity') {
+    p.mask_contrast = Number($('maskContrast').value);
+    p.levels_blend = $('levelsBlend').value;
+    for (const [key, id] of Object.entries(bwFields)) p[key] = Number($(id).value);
+    if (!['normal', 'vivid_light'].includes(p.levels_blend) ||
+        ![p.mask_contrast, ...Object.keys(bwFields).map(key => p[key])].every(Number.isInteger)) {
+      throw new Error('Bitte gültige Werte für Maskenkontrast, Farbregler und Mischmodus eingeben.');
     }
   }
   return p;
@@ -80,12 +93,18 @@ function parameters(checkOutput = true) {
 function updateMode() {
   const mode = $('mode').value;
   const luminance = mode === 'luminance';
+  const affinity = mode === 'affinity';
   $('coverageControls').hidden = mode !== 'color';
   $('coverage').disabled = mode !== 'color';
-  $('luminanceControls').hidden = !luminance;
-  for (const id of ['ink', 'invert', ...toneFields, 'resetTones']) $(id).disabled = !luminance;
+  $('luminanceControls').hidden = !(luminance || affinity);
+  $('inkControl').hidden = !luminance;
+  $('ink').disabled = !luminance;
+  for (const id of ['invert', ...toneFields, 'resetTones']) $(id).disabled = !(luminance || affinity);
+  $('affinityControls').hidden = !affinity;
+  for (const id of [...affinityFields, 'levelsBlend', 'affinityPreset']) $(id).disabled = !affinity;
   $('modeInfo').textContent = mode === 'color' ?
-    'Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken.' : luminance ?
+    'Bildfarben einschließlich Weiß bleiben erhalten. Die Deckung bestimmt die transparenten Lücken.' : affinity ?
+    'Wie im Affinity-Handout: Eine Helligkeitsmaske rastert die Originalfarben. Helle Bereiche erzeugen mehr Druckfläche, dunkle werden transparent. Tonwerte und Farbregler beeinflussen nur die Maske.' : luminance ?
     'Dunkle Bildstellen erzeugen mehr Druckfläche in der gewählten Druckfarbe. Vorhandene Transparenz bleibt berücksichtigt.' :
     'Weiche Transparenz wird in deckende Punkte umgewandelt. Vollständig deckende Bereiche und die Bildfarben bleiben erhalten; ohne Transparenz entstehen keine Lücken.';
 }
@@ -267,12 +286,13 @@ $('render').addEventListener('click', async () => {
 $('cancel').addEventListener('click', () => { invalidate(); renderOriginal(); message('Berechnung abgebrochen.'); });
 
 const presetFields = { width_cm: 'width', ppi: 'ppi', spacing_mm: 'spacing', coverage: 'coverage',
-  angle_deg: 'angle', mode: 'mode', ink_color: 'ink', invert: 'invert', black_point: 'black', white_point: 'white', gamma: 'gamma' };
+  angle_deg: 'angle', mode: 'mode', ink_color: 'ink', invert: 'invert', black_point: 'black', white_point: 'white', gamma: 'gamma',
+  mask_contrast: 'maskContrast', levels_blend: 'levelsBlend', ...bwFields };
 
 $('saveSettings').addEventListener('click', () => {
   try {
     const p = Object.fromEntries(Object.entries(presetFields).map(([key, id]) => [key,
-      key === 'invert' ? $(id).checked : ['mode', 'ink_color'].includes(key) ? $(id).value :
+      key === 'invert' ? $(id).checked : ['mode', 'ink_color', 'levels_blend'].includes(key) ? $(id).value :
         $(id).value === '' ? NaN : Number($(id).value)]));
     const view = { background: $('background').value, color: $('color').value, zoom: $('zoom').value };
     const json = RasterPilotSettings.serialize(p, view);
@@ -306,8 +326,27 @@ $('loadSettings').addEventListener('change', async event => {
 });
 
 for (const id of fields) $(id).addEventListener('input', () => { invalidate(); renderOriginal(); });
-for (const id of ['mode', 'ink', 'invert', ...toneFields]) $(id).addEventListener('input', () => {
+for (const id of ['mode', 'ink', 'invert', ...toneFields, ...affinityFields, 'levelsBlend']) $(id).addEventListener('input', () => {
   updateMode(); invalidate(); renderOriginal();
+});
+$('affinityPreset').addEventListener('click', () => {
+  const width = Number($('width').value), ppi = Number($('ppi').value);
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(ppi) || ppi < 36 || ppi > 1200) {
+    message('Bitte zuerst eine gültige Druckbreite und Auflösung eingeben.'); return;
+  }
+  // 10 Referenzpixel / 1904 Bildpixel, auf die Druckbreite übertragen.
+  const requested = width * 10 * 10 / 1904;
+  const spacing = Math.max(0.1, Math.round(requested * 1000) / 1000,
+    Math.ceil(50.8 / ppi * 1000) / 1000);
+  if (spacing > 10) {
+    message('Das Handout-Beispiel ergibt mehr als 10 mm Rasterabstand. Bitte die Druckbreite verringern.'); return;
+  }
+  $('mode').value = 'affinity'; $('angle').value = '45'; $('spacing').value = String(spacing);
+  $('black').value = '0'; $('white').value = '184'; $('gamma').value = '1';
+  $('invert').checked = false; $('maskContrast').value = '85'; $('levelsBlend').value = 'vivid_light';
+  for (const id of Object.values(bwFields)) $(id).value = '100';
+  updateMode(); invalidate(); renderOriginal();
+  if (!$('render').disabled) message(`Handout-Beispiel übernommen: Weißpunkt 184 ≈ 72 %, Rasterabstand ${spacing.toFixed(3)} mm. Raster neu berechnen und bei 100 % prüfen.${spacing > requested + 0.001 ? ' Der Abstand wurde auf die Mindestgröße von zwei Exportpixeln angehoben.' : ''}`);
 });
 $('resetTones').addEventListener('click', () => {
   $('black').value = '0'; $('white').value = '255'; $('gamma').value = '1';

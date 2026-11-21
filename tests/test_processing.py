@@ -197,6 +197,88 @@ class ProcessingTest(unittest.TestCase):
                                      black_point=64, white_point=192, gamma=2)
         np.testing.assert_array_equal(original, explicit)
 
+    def test_affinity_lights_mask_preserves_source_colors_and_inverts(self):
+        image = Image.new('RGBA', (256, 256))
+        colors = [(0, 0, 0, 255), (64, 64, 64, 255), (128, 128, 128, 255), (255, 255, 255, 255)]
+        for index, color in enumerate(colors):
+            image.paste(color, (index * 64, 0, (index + 1) * 64, 256))
+        for angle in (0, 45):
+            for invert in (False, True):
+                array, _, _ = self.result(image, mode='affinity', mask_contrast=0,
+                                         angle_deg=angle, invert=invert, ink_color='#ff0000')
+                for index, color in enumerate(colors):
+                    visible = array[:, index * 64:(index + 1) * 64, 3] == 255
+                    expected = color[0] / 255
+                    self.assertAlmostEqual(visible.mean(), 1 - expected if invert else expected, delta=0.02)
+                visible = array[:, :, 3] == 255
+                np.testing.assert_array_equal(array[visible, :3], np.array(image)[visible, :3])
+                self.assertLessEqual(set(np.unique(array[:, :, 3])), {0, 255})
+
+    def test_affinity_levels_gamma_and_alpha_only_change_mask(self):
+        image = Image.new('RGBA', (256, 256), (100, 150, 200, 128))
+        image.paste((255, 255, 255, 0), (0, 0, 128, 256))
+        for gamma in (0.5, 1, 2):
+            array, _, _ = self.result(image, mode='affinity', mask_contrast=0,
+                                     black_point=64, white_point=192, gamma=gamma)
+            # Korrigierte Lichterauswahl am Arbeitsraster, nicht hart am Motiv.
+            threshold = (64 + 128 * 0.5 ** gamma) / 255
+            brightness = np.dot([100, 150, 200], [0.2126, 0.7152, 0.0722]) / 255
+            expected = np.clip(brightness + 0.5 - threshold, 0, 1) * 128 / 255
+            self.assertTrue(np.all(array[:, :128, 3] == 0))
+            self.assertAlmostEqual((array[:, 128:, 3] == 255).mean(), expected, delta=0.02)
+            self.assertTrue(np.all(array[array[:, :, 3] == 255, :3] == [100, 150, 200]))
+
+    def test_affinity_six_color_controls_change_matching_hue_only(self):
+        colors = [(255, 0, 0), (255, 255, 0), (0, 255, 0), (0, 255, 255), (0, 0, 255), (255, 0, 255)]
+        names = ['red', 'yellow', 'green', 'cyan', 'blue', 'magenta']
+        for color, name in zip(colors, names):
+            image = Image.new('RGBA', (256, 256), (*color, 255))
+            with self.subTest(color=name):
+                baseline, _, _ = self.result(image, mode='affinity', mask_contrast=0)
+                changed, _, _ = self.result(image, mode='affinity', mask_contrast=0, **{f'bw_{name}': 0})
+                self.assertTrue(np.any(baseline[:, :, 3]))
+                self.assertFalse(np.any(changed[:, :, 3]))
+                other = names[(names.index(name) + 3) % 6]
+                unrelated, _, _ = self.result(image, mode='affinity', mask_contrast=0, **{f'bw_{other}': 0})
+                np.testing.assert_array_equal(baseline, unrelated)
+        gray = Image.new('RGBA', (256, 256), (128, 128, 128, 255))
+        baseline, _, _ = self.result(gray, mode='affinity', mask_contrast=0)
+        changed, _, _ = self.result(gray, mode='affinity', mask_contrast=0,
+                                  **{f'bw_{name}': 0 for name in names})
+        np.testing.assert_array_equal(baseline, changed)
+
+    def test_affinity_mask_contrast_and_vivid_light_have_defined_effects(self):
+        for gray in (0, 64, 128, 192, 255):
+            image = Image.new('RGBA', (256, 256), (gray, gray, gray, 255))
+            for contrast in (0, 85, 100):
+                # Schärferes Arbeitsraster darf die Mitteltöne nicht vernichten.
+                array, _, _ = self.result(image, mode='affinity', mask_contrast=contrast)
+                self.assertAlmostEqual((array[:, :, 3] == 255).mean(), gray / 255, delta=0.012)
+        image = Image.new('RGBA', (256, 256), (128, 128, 128, 255))
+        for black, white, threshold in ((0, 192, 192 / 447), (64, 255, 255 / 446)):
+            for contrast in (0, 85):
+                array, _, _ = self.result(image, mode='affinity', mask_contrast=contrast,
+                                         black_point=black, white_point=white, levels_blend='vivid_light')
+                # Unabhängig gelöste Dodge-/Burn-Schwellen A = 0,5.
+                expected = 128 / 255 + (0.5 - threshold) / (1 + contrast / 10)
+                self.assertAlmostEqual((array[:, :, 3] == 255).mean(), expected, delta=0.012)
+
+    def test_affinity_settings_do_not_change_existing_modes(self):
+        image = Image.new('RGBA', (256, 256), (100, 160, 200, 128))
+        for mode in ('color', 'luminance', 'alpha'):
+            baseline, _, _ = self.result(image, mode=mode)
+            changed, _, _ = self.result(image, mode=mode, mask_contrast=0, levels_blend='vivid_light',
+                                      bw_red=0, bw_yellow=200, bw_green=0, bw_cyan=200, bw_blue=0, bw_magenta=200)
+            np.testing.assert_array_equal(baseline, changed)
+
+    def test_affinity_parameters_are_validated_in_all_modes(self):
+        for change in (dict(mask_contrast=-1), dict(mask_contrast=101), dict(mask_contrast=True),
+                       dict(levels_blend='other'), dict(levels_blend=[]), dict(bw_red=-1),
+                       dict(bw_yellow=201), dict(bw_green=100.5), dict(bw_cyan=True),
+                       dict(bw_blue='100'), dict(bw_magenta=float('nan'))):
+            with self.subTest(change=change), self.assertRaises(ImageError):
+                Parameters.from_dict(options(mode='affinity', **change), (256, 256))
+
     def test_invalid_parameters_and_limits(self):
         for changes in (dict(width_cm=float('nan')), dict(coverage=float('inf')),
                         dict(ppi=True), dict(ppi=100.5), dict(width_cm='28'),

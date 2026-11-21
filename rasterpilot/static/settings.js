@@ -8,7 +8,7 @@ globalThis.RasterPilotSettings = (() => {
   const affinityKeys = ['mask_contrast', 'levels_blend', 'bw_red', 'bw_yellow', 'bw_green', 'bw_cyan', 'bw_blue', 'bw_magenta'];
   const affinityDefaults = Object.freeze({ gamma: 1, invert: false, mask_contrast: 85, levels_blend: 'normal',
     bw_red: 100, bw_yellow: 100, bw_green: 100, bw_cyan: 100, bw_blue: 100, bw_magenta: 100 });
-  const viewDefaults = Object.freeze({ background: 'textile', color: '#233246', zoom: 'fit' });
+  const viewDefaults = Object.freeze({ background: 'textile', color: '#233246', zoom: 'fit', tone_overlay: false });
   const ranges = { width_cm: [0.1, 200], ppi: [36, 1200], spacing_mm: [0.1, 10],
     coverage: [0, 100], angle_deg: [-180, 180], black_point: [0, 254], white_point: [1, 255], gamma: [0.1, 5],
     mask_contrast: [0, 100], bw_red: [0, 200], bw_yellow: [0, 200], bw_green: [0, 200],
@@ -16,8 +16,15 @@ globalThis.RasterPilotSettings = (() => {
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const color = value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
   function validate(data) {
-    if (!object(data) || data.format !== 'RasterPilot' || ![1, 2, 3].includes(data.version) ||
-        !object(data.settings) || !object(data.view)) throw new Error('Keine unterstützte RasterPilot-Einstellungsdatei (Version 1, 2 oder 3).');
+    if (!object(data) || data.format !== 'RasterPilot' || ![1, 2, 3, 4].includes(data.version) ||
+        !object(data.settings) || !object(data.view)) throw new Error('Keine unterstützte RasterPilot-Einstellungsdatei (Version 1 bis 4).');
+    if (data.version < 4) {
+      const keys = ['background', 'color', 'zoom'];
+      if (Object.keys(data.view).length !== keys.length || keys.some(key => !Object.hasOwn(data.view, key))) {
+        throw new Error('Die früheren Ansichtseinstellungen sind unvollständig oder enthalten unbekannte Werte.');
+      }
+      data = { ...data, view: { ...data.view, tone_overlay: false } };
+    }
     if (data.version === 1) {
       const oldKeys = Object.keys(defaults).filter(key => !affinityKeys.includes(key));
       if (Object.keys(data.settings).length !== oldKeys.length ||
@@ -47,16 +54,17 @@ globalThis.RasterPilotSettings = (() => {
         p.black_point >= p.white_point || p.spacing_mm / 25.4 * p.ppi < 2 ||
         !['color', 'luminance', 'alpha', 'affinity'].includes(p.mode) || !color(p.ink_color) || typeof p.invert !== 'boolean' ||
         !['normal', 'vivid_light'].includes(p.levels_blend) ||
-        !['textile', 'checker'].includes(v.background) || !color(v.color) || !['fit', 'actual'].includes(v.zoom)) {
+        !['textile', 'checker'].includes(v.background) || !color(v.color) || !['fit', 'actual'].includes(v.zoom) ||
+        typeof v.tone_overlay !== 'boolean') {
       throw new Error('Ungültige Raster- oder Ansichtseinstellungen. Bitte Werte und Tonwertgrenzen prüfen.');
     }
     // Nur bekannte Schlüssel kopieren; keine Dateipfade oder Inhalte übernehmen.
-    return { format: 'RasterPilot', version: 3,
+    return { format: 'RasterPilot', version: 4,
       settings: { ...Object.fromEntries(Object.keys(defaults).map(key => [key, p[key]])),
         ...(p.mode === 'affinity' ? affinityDefaults : {}) },
       view: Object.fromEntries(Object.keys(viewDefaults).map(key => [key, v[key]])) };
   }
   return Object.freeze({ defaults, affinityDefaults, viewDefaults, validate,
     parse: text => validate(JSON.parse(text)),
-    serialize: (settings, view) => JSON.stringify(validate({ format: 'RasterPilot', version: 3, settings, view }), null, 2) });
+    serialize: (settings, view) => JSON.stringify(validate({ format: 'RasterPilot', version: 4, settings, view }), null, 2) });
 })();

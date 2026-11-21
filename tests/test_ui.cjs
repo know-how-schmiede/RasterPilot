@@ -12,7 +12,7 @@ async function waitForSubmission(ui) {
 }
 
 function setup({ sourceWidth = 256, sourceHeight = 256,
-  downloadName = 'motiv_rp_280_300ppi_0G.png', states = ['done'], queueError = null } = {}) {
+  downloadName = 'motiv_rp_280_300ppi_0G.png', states = ['done'], queueError = null, previewPixels = null } = {}) {
   const controls = {};
   const defaults = { width: '28', ppi: '300', angle: '0', mode: 'color', ink: '#000000',
     black: '0', white: '255', gamma: '1',
@@ -20,7 +20,8 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   const names = [...Object.keys(defaults), 'message', 'dimensions', 'spacingInfo', 'canvas', 'stage',
     'download', 'result', 'renderState', 'resultOption', 'originalOption', 'render', 'file', 'settings', 'viewSettings', 'empty', 'imageNotes',
     'invert', 'modeInfo', 'coverageControls', 'luminanceControls', 'resetTones', 'cancel',
-    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'gammaControl', 'invertControl', 'affinityControls'];
+    'saveSettings', 'loadSettings', 'presetDownload', 'inkControl', 'gammaControl', 'invertControl', 'affinityControls',
+    'tone_overlay', 'overlayControls', 'overlayLegend', 'overlayCaption', 'overlayInfo'];
   for (const name of names) {
     const listeners = {};
     controls[name] = {
@@ -32,7 +33,15 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
       setAttribute(key, value) { this.attrs[key] = value; },
       removeAttribute(key) { delete this[key]; },
       checkValidity() { return name !== 'angle' || (Number(this.value) >= -180 && Number(this.value) <= 180); },
-      getContext() { return { drawImage: (...args) => { this.drawArgs = args; } }; },
+      getContext() { return {
+        drawImage: (...args) => { this.drawArgs = args; },
+        getImageData: (x, y, width, height) => {
+          this.reads = (this.reads || 0) + 1;
+          return { data: previewPixels ? new Uint8ClampedArray(previewPixels) : new Uint8ClampedArray(width * height * 4) };
+        },
+        createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+        putImageData: data => { this.painted = new Uint8ClampedArray(data.data); }
+      }; },
       decode: async () => {}, classList: { toggle() {} }
     };
   }
@@ -41,11 +50,13 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
   const calls = [];
   const downloads = [];
   let queueCallbacks;
+  const frames = [];
   const ctx = vm.createContext({
     RasterPilotJobs: { refresh: async () => {}, start: callbacks => { queueCallbacks = callbacks; } },
     document: { getElementById: id => controls[id] },
     URL: { createObjectURL: blob => { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} },
     AbortController, FormData, Blob, setTimeout: (fn, delay) => setTimeout(fn, Math.min(delay, 10)), clearTimeout,
+    requestAnimationFrame: callback => { frames.push(callback); return frames.length; },
     createImageBitmap: async () => ({ width: 256, height: 256, close() {} }),
     fetch: async (path, request) => {
       calls.push([path, request.method]);
@@ -65,12 +76,15 @@ function setup({ sourceWidth = 256, sourceHeight = 256,
     }
   });
   vm.runInContext(readFileSync('rasterpilot/static/settings.js', 'utf8'), ctx);
+  vm.runInContext(readFileSync('rasterpilot/static/tone-overlay.js', 'utf8'), ctx);
   vm.runInContext(readFileSync('rasterpilot/static/app.js', 'utf8'), ctx);
-  async function importImage() {
-    controls.file.files = [new Blob(['original'], { type: 'image/png' })];
+  async function importImage(name = 'original.png') {
+    const file = new Blob(['original'], { type: 'image/png' }); file.name = name;
+    controls.file.files = [file];
     await controls.file.fire('change');
   }
   return { c: controls, importImage, calls, downloads, ctx, queueCallbacks: () => queueCallbacks,
+    flushFrames: () => { while (frames.length) frames.shift()(); }, frames,
     submitted: () => submitted, defer: promise => { pending = promise; } };
 }
 
@@ -283,7 +297,7 @@ test('Einstellungen lassen sich ohne Bild speichern und nach Import vollständig
   const data = JSON.parse(ui.ctx.RasterPilotSettings.serialize(
     { ...ui.ctx.RasterPilotSettings.defaults, mode: 'luminance', ink_color: '#aabbcc', invert: true,
       black_point: 10, white_point: 240, gamma: 2, width_cm: 20, coverage: 40 },
-    { background: 'checker', color: '#ff0000', zoom: 'actual' }));
+    { background: 'checker', color: '#ff0000', zoom: 'actual', tone_overlay: false }));
   ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
   await ui.c.loadSettings.fire('change');
   assert.equal(ui.c.mode.value, 'luminance');
@@ -402,7 +416,7 @@ test('Alter Affinity-Import meldet neue Berechnung und erhält Tonwerte, Geometr
   assert.equal(ui.submitted().spacing_mm, 1.471);
   ui.c.saveSettings.fire('click');
   const saved = JSON.parse(await ui.downloads.at(-1).text());
-  assert.equal(saved.version, 3);
+  assert.equal(saved.version, 4);
   assert.equal(saved.settings.gamma, 1);
   assert.equal(saved.settings.bw_blue, 100);
   assert.equal(saved.settings.black_point, 10);
@@ -448,7 +462,7 @@ test('Altimport im Farbmodus erhält dessen gespeicherte Tonwerte für spätere 
   const ui = setup();
   const data = { format: 'RasterPilot', version: 2,
     settings: { ...ui.ctx.RasterPilotSettings.defaults, mode: 'color', black_point: 30, white_point: 220, gamma: 2 },
-    view: { ...ui.ctx.RasterPilotSettings.viewDefaults } };
+    view: { background: 'textile', color: '#233246', zoom: 'fit' } };
   ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
   await ui.c.loadSettings.fire('change');
   await ui.importImage();
@@ -475,4 +489,113 @@ test('Fertige Ergebnisse bleiben bei Einstellungswechseln gespeichert und nach N
   fresh.queueCallbacks().removed('job1');
   assert.equal(fresh.c.download.hidden, true);
   assert.equal(fresh.c.empty.hidden, false);
+});
+
+test('Tonwertüberlagerung aktualisiert live ohne Netzwerk, erhält die Quelle und fasst Eingaben zusammen', async () => {
+  const pixels = [0, 0, 0, 255, 128, 128, 128, 255, 255, 255, 255, 255];
+  const ui = setup({ sourceWidth: 3, sourceHeight: 1, previewPixels: pixels });
+  await ui.importImage('Eichhörnchen.png');
+  ui.c.mode.value = 'affinity'; ui.c.mode.fire('input'); ui.flushFrames();
+  assert.equal(ui.c.tone_overlay.checked, false);
+  assert.deepEqual(Array.from(ui.c.canvas.painted), pixels);
+  const before = ui.calls.length;
+  ui.c.tone_overlay.checked = true; ui.c.tone_overlay.fire('input');
+  assert.equal(ui.c.overlayLegend.hidden, false);
+  assert.match(ui.c.overlayCaption.textContent, /Eichhörnchen.png/);
+  ui.flushFrames();
+  assert.deepEqual(Array.from(ui.c.canvas.painted), [96, 27, 27, 255, 177, 158, 85, 255, 167, 232, 191, 255]);
+  ui.c.white.value = '128'; ui.c.white.fire('input');
+  ui.c.white.value = '180'; ui.c.white.fire('input');
+  ui.c.white.value = '200'; ui.c.white.fire('input');
+  assert.equal(ui.frames.length, 1);
+  ui.flushFrames();
+  assert.equal(ui.c.canvas.reads, 1);
+  assert.equal(ui.calls.length, before);
+  ui.c.tone_overlay.checked = false; ui.c.tone_overlay.fire('input'); ui.flushFrames();
+  assert.deepEqual(Array.from(ui.c.canvas.painted), pixels);
+  assert.equal(ui.c.overlayLegend.hidden, true);
+});
+
+test('Ungültige Tonwerte entfernen nur die Markierung; Druckgrößenfehler lassen Bereiche nutzbar', async () => {
+  const pixels = [128, 128, 128, 255];
+  const ui = setup({ sourceWidth: 1, sourceHeight: 1, previewPixels: pixels });
+  await ui.importImage();
+  ui.c.mode.value = 'affinity'; ui.c.mode.fire('input');
+  ui.c.tone_overlay.checked = true; ui.c.tone_overlay.fire('input'); ui.flushFrames();
+  ui.c.black.value = '128'; ui.c.white.value = '128'; ui.c.white.fire('input'); ui.flushFrames();
+  assert.equal(ui.c.canvas.hidden, false);
+  assert.equal(ui.c.render.disabled, true);
+  assert.equal(ui.c.overlayLegend.hidden, true);
+  assert.deepEqual(Array.from(ui.c.canvas.painted), pixels);
+  ui.c.black.value = ''; ui.c.black.fire('input'); ui.flushFrames();
+  assert.equal(ui.c.overlayLegend.hidden, true);
+  ui.c.black.value = '0'; ui.c.white.value = '245'; ui.c.width.value = '200'; ui.c.width.fire('input'); ui.flushFrames();
+  assert.equal(ui.c.render.disabled, true);
+  assert.equal(ui.c.canvas.hidden, false);
+  assert.equal(ui.c.overlayLegend.hidden, false);
+  assert.notDeepEqual(Array.from(ui.c.canvas.painted), pixels);
+  ui.c.mode.value = 'luminance'; ui.c.mode.fire('input'); ui.flushFrames();
+  assert.equal(ui.c.overlayControls.hidden, true);
+  assert.deepEqual(Array.from(ui.c.canvas.painted), pixels);
+});
+
+test('Überlagerung wird mit JSON gespeichert und ist vor dem Originalupload nur vorgemerkt', async () => {
+  const ui = setup();
+  const data = { format: 'RasterPilot', version: 4,
+    settings: { ...ui.ctx.RasterPilotSettings.defaults, mode: 'affinity', white_point: 245 },
+    view: { ...ui.ctx.RasterPilotSettings.viewDefaults, tone_overlay: true } };
+  ui.c.loadSettings.files = [new Blob([JSON.stringify(data)])];
+  await ui.c.loadSettings.fire('change');
+  assert.equal(ui.c.tone_overlay.checked, true);
+  assert.equal(ui.c.tone_overlay.disabled, true);
+  assert.equal(ui.c.overlayLegend.hidden, true);
+  await ui.importImage(); ui.flushFrames();
+  assert.equal(ui.c.overlayLegend.hidden, false);
+  ui.c.saveSettings.fire('click');
+  const saved = JSON.parse(await ui.downloads.at(-1).text());
+  assert.equal(saved.version, 4);
+  assert.equal(saved.view.tone_overlay, true);
+  assert.doesNotMatch(ui.c.message.textContent, /frühere Affinity-Modus/);
+  await ui.importImage('anderes.png'); ui.flushFrames();
+  assert.match(ui.c.overlayCaption.textContent, /anderes.png/);
+});
+
+test('Ergebnisansicht schaltet Markierung aus; Schalter verändert weder Exportparameter noch vorhandenen Download', async () => {
+  const ui = setup();
+  await ui.importImage();
+  ui.c.mode.value = 'affinity'; ui.c.mode.fire('input');
+  ui.c.tone_overlay.checked = true; ui.c.tone_overlay.fire('input'); ui.flushFrames();
+  await ui.c.render.fire('click');
+  assert.equal(ui.c.tone_overlay.checked, false);
+  assert.equal(ui.c.overlayLegend.hidden, true);
+  assert.equal(ui.submitted().tone_overlay, undefined);
+  const download = ui.c.download.href, before = ui.calls.length;
+  ui.c.tone_overlay.checked = true; ui.c.tone_overlay.fire('input'); ui.flushFrames();
+  assert.equal(ui.c.view.value, 'original');
+  assert.equal(ui.c.download.href, download);
+  assert.equal(ui.calls.length, before);
+  ui.c.view.value = 'result'; ui.c.view.fire('input');
+  assert.equal(ui.c.tone_overlay.checked, false);
+  assert.equal(ui.c.overlayLegend.hidden, true);
+  const fresh = setup();
+  await fresh.queueCallbacks().show({ id: 'job1' });
+  assert.equal(fresh.c.tone_overlay.disabled, true);
+  assert.equal(fresh.c.overlayLegend.hidden, true);
+});
+
+test('Aktivierung während eines wartenden Auftrags löst nur dessen Anzeige und bricht ihn nicht ab', async () => {
+  const ui = setup({ states: ['queued'] });
+  await ui.importImage();
+  ui.c.mode.value = 'affinity'; ui.c.mode.fire('input');
+  const running = ui.c.render.fire('click');
+  for (let count = 0; count < 50 && !ui.c.message.textContent.includes('Warteschlange'); count++) {
+    await new Promise(setImmediate);
+  }
+  assert.match(ui.c.message.textContent, /Warteschlange/);
+  ui.c.tone_overlay.checked = true; ui.c.tone_overlay.fire('input');
+  await running; ui.flushFrames();
+  assert.equal(ui.calls.some(([, method]) => method === 'DELETE'), false);
+  assert.equal(ui.c.view.value, 'original');
+  assert.equal(ui.c.tone_overlay.checked, true);
+  assert.equal(ui.c.overlayLegend.hidden, false);
 });

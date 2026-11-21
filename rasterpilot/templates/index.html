@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version) }}">
   <script src="{{ url_for('static', filename='settings.js', v=version) }}" defer></script>
   <script src="{{ url_for('static', filename='jobs.js', v=version) }}" defer></script>
+  <script src="{{ url_for('static', filename='tone-overlay.js', v=version) }}" defer></script>
   <script src="{{ url_for('static', filename='app.js', v=version) }}" defer></script>
 </head>
 <body>
@@ -66,6 +67,16 @@
       <label>Zoom <select id="zoom" disabled><option value="fit">Einpassen</option><option value="actual">100 % · Exportpixel prüfen</option></select></label>
       <label>Hintergrund <select id="background"><option value="textile">Textilfarbe</option><option value="checker">Transparenzraster</option></select></label>
       <label>Textilfarbe <input id="color" type="color" value="#233246"></label>
+      </div>
+      <div id="overlayControls" class="overlay-controls" hidden>
+        <label class="check"><input id="tone_overlay" type="checkbox" disabled> Tonwertbereiche anzeigen</label>
+        <p id="overlayInfo" class="hint"></p>
+        <div id="overlayLegend" class="overlay-legend" aria-label="Legende der Tonwertbereiche" hidden>
+          <span><i class="overlay-green" aria-hidden="true"></i>Grün: geschlossen, Originalfarbe</span>
+          <span><i class="overlay-red" aria-hidden="true"></i>Rot: entfernt, Shirt sichtbar</span>
+          <span><i class="overlay-yellow" aria-hidden="true"></i>Gelb: Rasterbereich</span>
+        </div>
+        <p id="overlayCaption" class="hint" hidden></p>
       </div>
     </fieldset>
     <div id="stage" class="stage" aria-busy="false"><canvas id="canvas" hidden></canvas><img id="result" alt="Berechnetes Halbtonraster" hidden><p id="empty">Wähle ein Bild aus, um die Vorschau zu starten.</p></div><p class="hint">Die Ergebnisansicht zeigt die Exportdatei. Bei 100 % kannst du das Bild durch Scrollen prüfen. Die verkleinerte Ansicht kann feine Raster verfälschen.</p><p class="hint">Experimentell und unkalibriert: Mindestpunkte und Lücken werden noch nicht anhand eines Druckprofils geprüft. Keine Druckfreigabe.</p>

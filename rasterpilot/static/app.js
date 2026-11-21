@@ -11,6 +11,8 @@ function rememberTones() {
   if (modeTones[toneMode]) modeTones[toneMode] = { black: $('black').value, white: $('white').value };
 }
 let image = null;
+let previewCache = null;
+let previewFrame = null;
 let originalFile = null;
 let sourceWidth = 0;
 let sourceHeight = 0;
@@ -104,29 +106,64 @@ function updateMode() {
 
 function updateView() {
   const showResult = hasResult && $('view').value === 'result';
-  $('canvas').hidden = !image || showResult || !$('render').dataset.valid;
+  $('canvas').hidden = !image || showResult;
   $('result').hidden = !showResult;
   $('empty').hidden = Boolean(image || showResult);
   $('zoom').disabled = !showResult;
   $('stage').classList.toggle('actual-size', showResult && $('zoom').value === 'actual');
   $('stage').classList.toggle('checker', $('background').value === 'checker');
   $('stage').style.backgroundColor = $('color').value;
+  const available = $('mode').value === 'affinity';
+  $('overlayControls').hidden = !available;
+  $('tone_overlay').disabled = !image || !previewCache;
+  const black = Number($('black').value), white = Number($('white').value);
+  const tonesValid = $('black').value !== '' && $('white').value !== '' && RasterPilotToneOverlay.valid(black, white);
+  const active = available && image && !showResult && $('tone_overlay').checked && tonesValid;
+  $('overlayLegend').hidden = !active;
+  $('overlayCaption').hidden = !active;
+  $('overlayCaption').textContent = active ? `Tonwertbereiche · Original: ${originalFile?.name || 'Gewähltes Bild'}` : '';
+  $('overlayInfo').textContent = !image ? 'Wähle ein Originalbild, um dessen Tonwertbereiche anzuzeigen.' :
+    $('tone_overlay').checked && !tonesValid ? 'Ungültige Tonwerte: Die Überlagerung ist ausgeblendet.' :
+    'Bereichsvorschau mit 40 % Einfärbung. Verkleinerte Ansicht; Rasterpunkte im Export bei 100 % prüfen.';
+  schedulePreview();
+}
+
+function schedulePreview() {
+  if (previewFrame !== null) return;
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = null;
+    if (!image || !previewCache || (hasResult && $('view').value === 'result')) return;
+    const black = $('black').value === '' ? NaN : Number($('black').value);
+    const white = $('white').value === '' ? NaN : Number($('white').value);
+    const marked = $('mode').value === 'affinity' && $('tone_overlay').checked &&
+      RasterPilotToneOverlay.tint(previewCache.tone, previewCache.output.data, black, white);
+    $('canvas').getContext('2d').putImageData(marked ? previewCache.output : previewCache.original, 0, 0);
+  });
+}
+
+function cacheOriginal() {
+  if (previewCache) return;
+  const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight));
+  const canvas = $('canvas');
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  const context = canvas.getContext('2d');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const original = context.getImageData(0, 0, canvas.width, canvas.height);
+  previewCache = { original, output: context.createImageData(canvas.width, canvas.height),
+    tone: RasterPilotToneOverlay.prepare(original.data) };
 }
 
 function renderOriginal() {
   if (!image) return;
   $('originalOption').disabled = false;
+  cacheOriginal();
   try {
     const p = parameters(false);
     const pw = Math.max(1, Math.round(p.width_cm / 2.54 * p.ppi));
     const ph = Math.max(1, Math.round(pw * sourceHeight / sourceWidth));
     $('dimensions').textContent = `${(p.width_cm * sourceHeight / sourceWidth).toFixed(2)} cm hoch · ${pw} × ${ph} px`;
     $('spacingInfo').textContent = `${(p.spacing_mm / 25.4 * p.ppi).toFixed(2)} Pixel Abstand der Punktmitten · Winkel ${p.angle_deg}°`;
-    const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight));
-    const canvas = $('canvas');
-    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
-    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
-    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
     $('render').disabled = false;
     $('render').dataset.valid = '1';
     message('');
@@ -160,7 +197,8 @@ $('file').addEventListener('change', async event => {
   const current = sequence;
   const file = event.target.files[0];
   if (image) image.close();
-  image = null; originalFile = null;
+  image = null; originalFile = null; previewCache = null;
+  updateView();
   $('settings').disabled = true;
   $('viewSettings').disabled = true;
   $('canvas').hidden = true;
@@ -210,6 +248,7 @@ async function loadResult(job, current, signal, archived = false) {
   await $('result').decode();
   if (current !== sequence) return;
   hasResult = true; resultJob = job.id; activeJob = null;
+  $('tone_overlay').checked = false;
   $('resultOption').disabled = false;
   $('originalOption').disabled = archived || !image;
   $('viewSettings').disabled = false;
@@ -293,7 +332,8 @@ $('saveSettings').addEventListener('click', () => {
       key === 'invert' ? $(id).checked : ['mode', 'ink_color'].includes(key) ? $(id).value :
         $(id).value === '' ? NaN : Number($(id).value)])) };
     if (p.mode === 'affinity') p.gamma = affinityDefaults.gamma;
-    const view = { background: $('background').value, color: $('color').value, zoom: $('zoom').value };
+    const view = { background: $('background').value, color: $('color').value, zoom: $('zoom').value,
+      tone_overlay: $('tone_overlay').checked };
     const json = RasterPilotSettings.serialize(p, view);
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     $('presetDownload').href = url;
@@ -319,7 +359,10 @@ $('loadSettings').addEventListener('change', async event => {
       if (key === 'invert') $(id).checked = data.settings[key];
       else $(id).value = String(data.settings[key]);
     }
-    for (const [id, value] of Object.entries(data.view)) $(id).value = value;
+    for (const [id, value] of Object.entries(data.view)) {
+      if (id === 'tone_overlay') $(id).checked = value;
+      else $(id).value = value;
+    }
     toneMode = data.settings.mode;
     if (!modeTones[toneMode]) modeTones.luminance = { black: $('black').value, white: $('white').value };
     rememberTones();
@@ -354,7 +397,19 @@ $('resetTones').addEventListener('click', () => {
   if ($('mode').value === 'luminance') $('gamma').value = '1';
   invalidate(); renderOriginal();
 });
-for (const id of ['color', 'background', 'view', 'zoom']) $(id).addEventListener('input', updateView);
+for (const id of ['color', 'background', 'zoom']) $(id).addEventListener('input', updateView);
+$('view').addEventListener('input', () => {
+  if ($('view').value === 'result') $('tone_overlay').checked = false;
+  updateView();
+});
+$('tone_overlay').addEventListener('input', () => {
+  if ($('tone_overlay').checked && image) {
+    // Nur die Anzeige vom laufenden Auftrag lösen; der Serverauftrag bleibt bestehen.
+    cancelRequest();
+    $('view').value = 'original'; $('originalOption').disabled = false;
+  }
+  updateView();
+});
 updateMode();
 RasterPilotJobs.start({
   show: async job => {

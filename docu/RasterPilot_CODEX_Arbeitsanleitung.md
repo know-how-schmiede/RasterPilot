@@ -163,6 +163,8 @@ Die Oberfläche führt durch „Bild – Druckgröße – Raster – Export“. 
 
 Die Richtung des Reglers eindeutig benennen: Mehr „Auflockerung“ bedeutet weniger bedruckte Fläche. Intern nur eine eindeutig definierte Deckungsgröße verwenden.
 
+Für „Schwarz durch Shirt ersetzen“ eine standardmäßig ausgeschaltete Live-Bereichsüberlagerung anbieten: Grün für geschlossene, unveränderte Farbflächen mit deckendem Originalalpha, Rot für vollständig entfernte sichtbare Pixel und Gelb für Rasterbereiche einschließlich Teiltransparenz. Volltransparenz bleibt unmarkiert. Mit 40 % Einfärbung auf dem Original und Textlegende arbeiten, Änderungen von Schwarz-/Weißpunkt lokal ohne Warteschlangenauftrag darstellen. Die Markierung ist ausschließlich eine Ansichtshilfe und wird als `view.tone_overlay` gespeichert; niemals exportieren. Bei ungültigen Tonwerten Markierung ausblenden und Original erhalten; beim Wechsel zur Ergebnisansicht ausschalten.
+
 Schnelle Vorschau mit reduzierter Auflösung anbieten. Sie muss dieselbe physische Rastergeometrie und dieselben Parameter wie der Export abbilden. Für feine Raster zusätzlich einen Ausschnitt in Exportauflösung anzeigen; eine verkleinerte Gesamtansicht reicht zur Punktprüfung nicht aus. Veraltete Vorschauantworten dürfen neuere Einstellungen nicht überschreiben.
 
 ## 7. Druckprofile und Kalibrierung

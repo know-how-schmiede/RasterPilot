@@ -79,6 +79,24 @@ Die Einstellungen unter „Ansicht“ befinden sich direkt über der Bildvorscha
 
 Textilfarbe und Transparenzraster sind reine Ansichtshilfen. Änderungen daran erfordern keine neue Berechnung und verändern die Druckdatei nicht.
 
+### Tonwertbereiche live anzeigen
+
+Im Modus **„Schwarz durch Shirt ersetzen“** gibt es unter „Ansicht“ den Schalter **„Tonwertbereiche anzeigen“**. Er startet ausgeschaltet. Beim Einschalten wird das aktuell geladene Original angezeigt; die Beschriftung nennt seinen Dateinamen. Die Legende erklärt die Einfärbung:
+
+- **Grün:** Die Fläche bleibt geschlossen und behält die Originalfarbe. Dafür muss der stärkste RGB-Kanal mindestens den Weißpunkt erreichen und das ursprüngliche Alpha vollständig deckend sein.
+- **Rot:** Die Fläche wird vollständig entfernt und durch das schwarze Shirt ersetzt. Der stärkste RGB-Kanal erreicht höchstens den Schwarzpunkt.
+- **Gelb:** Die Fläche wird gerastert. Dazu zählen die Zwischenstufen und bereits teiltransparente Bereiche, solange sie nicht vollständig entfernt werden.
+
+Bereits vollständig transparente Stellen bleiben unmarkiert. Die Farben werden mit 40 % Stärke eingeblendet; Motivdetails und das ursprüngliche Alpha bleiben erkennbar. Ändere Schwarz- oder Weißpunkt, um die Grenzen live zu verfolgen. Es entstehen weder neue Serveranfragen noch Warteschlangenaufträge. Ein bereits angenommener Auftrag läuft weiter und bleibt über die Auftragsliste erreichbar.
+
+Beim Ausschalten erscheint das unveränderte Original. Die Ergebnisansicht, einschließlich gespeicherter Ergebnisse aus der Auftragsliste, schaltet die Markierung aus. Ohne geladenes Original ist der Schalter deaktiviert; in anderen Rastermodi wird er ausgeblendet. Bei ungültigen Tonwerten verschwindet die Markierung, das Original bleibt sichtbar. Fehler in Druckgröße oder Auflösung verhindern die Flächenkontrolle mit gültigen Tonwerten nicht.
+
+Die Markierung verwendet die auf maximal 1600 Pixel Kantenlänge verkleinerte Importvorschau und zeigt Flächenklassen. Kleine Detailgrenzen können durch die Skalierung vom Export abweichen. Die einzelnen Rasterpunkte weiterhin am berechneten Ergebnis bei 100 % prüfen. Legende und Einfärbung werden nie in das PNG exportiert.
+
+Der Ein-/Aus-Zustand wird in der Einstellungsdatei gespeichert. Wird eine eingeschaltete Ansicht ohne Original geladen, ist sie bis zum Bildimport vorgemerkt. Dateien der bisherigen Versionen 1–3 starten ohne Markierung.
+
+### PNG herunterladen
+
 „PNG herunterladen“ speichert die aktuelle Ergebnisdatei unter `<Originalname>_rp_<Druckbreite in mm>_<Auflösung>ppi_<Winkel>G.png`. Die ursprüngliche Dateiendung wird ersetzt. Beispiel: Aus `Eichhörnchen.jpg` wird bei 28 cm Breite, 300 ppi und 45° die Datei `Eichhörnchen_rp_280_300ppi_45G.png`. Negative Winkel erhalten ihr Minuszeichen. Leerzeichen, Umlaute und weitere Punkte im Originalnamen bleiben erhalten; unzulässige Zeichen werden durch Unterstriche ersetzt und sehr lange Namen gekürzt. Die Unterstriche zwischen den Parametern sind auch unter Windows verwendbar. Deckung und Rasterabstand sind nicht im Namen enthalten.
 
 Die Datei enthält sRGB-Profil, Pixelmaße und Auflösungsmetadaten, aber weder Textilfarbe noch Schachbrett. Die berechnete Druckbreite in der RIP-Software kontrollieren und das bereits gerasterte Bild dort nicht nachträglich skalieren. Vor einer Produktion sind Testdruck und Kalibrierung erforderlich.
@@ -87,7 +105,7 @@ Das Dateinamensschema bleibt in allen Modi gleich. Modus, Druckfarbe und Tonwert
 
 ## 5. Einstellungen speichern und laden
 
-Über „Einstellungen speichern und laden“ oberhalb der Bildauswahl eine JSON-Datei speichern oder öffnen. Die Datei enthält Druckmaße, Auflösung, Rastermodus, Abstand, Winkel, Deckung, Druckfarbe, Umkehrung und Tonwerte sowie Hintergrund, Textilfarbe und Zoom. Neue Dateien verwenden **Formatversion 3** und benötigen RasterPilot ab 0.6.0. Vollständige Dateien der Versionen 1 und 2 bleiben ladbar. Bei früheren Affinity-Dateien erscheint ein Hinweis auf die neue Berechnung mit aufgehellten Punkten; Schwarz-/Weißpunkt, Rastergeometrie und Ansicht werden übernommen. Das Ergebnis unterscheidet sich bewusst von der früheren Affinity-Ausgabe. Die weiterhin enthaltenen alten Zusatzfelder werden in diesem Modus ignoriert, Umkehrung wird deaktiviert. Die drei anderen Modi behalten ihre Einstellungen und Berechnung. Die Datei enthält weder Bilddaten noch Server-Aufträge oder Dateipfade und kann auch ohne gewähltes Bild verwendet werden.
+Über „Einstellungen speichern und laden“ oberhalb der Bildauswahl eine JSON-Datei speichern oder öffnen. Die Datei enthält Druckmaße, Auflösung, Rastermodus, Abstand, Winkel, Deckung, Druckfarbe, Umkehrung und Tonwerte sowie Hintergrund, Textilfarbe, Zoom und den Schalter für die Tonwertüberlagerung. Neue Dateien verwenden **Formatversion 4** und benötigen RasterPilot ab 0.8.0. Vollständige Dateien der Versionen 1–3 bleiben ladbar und erhalten einen ausgeschalteten Überlagerungsschalter. Bei früheren Affinity-Dateien der Versionen 1/2 erscheint weiterhin der Hinweis auf die neue Berechnung mit aufgehellten Punkten; Schwarz-/Weißpunkt, Rastergeometrie und Ansicht werden übernommen. Version 3 verwendet bereits diese Berechnung. Die weiterhin enthaltenen alten Zusatzfelder werden in diesem Modus ignoriert, Umkehrung wird deaktiviert. Die drei anderen Modi behalten ihre Einstellungen und Berechnung. Die Datei enthält weder Bilddaten noch Server-Aufträge oder Dateipfade und kann auch ohne gewähltes Bild verwendet werden.
 
 Beim Laden wird die ganze Datei geprüft, bevor Werte übernommen werden. Beschädigte Dateien, unbekannte Versionen, unzulässige Werte und Dateien über 64 KiB werden abgewiesen; die bisherigen Einstellungen und ein vorhandenes Ergebnis bleiben dabei erhalten. Nach erfolgreichem Laden das Raster neu berechnen. Ein Originalbild muss bei Bedarf erneut ausgewählt werden. Die Ansicht startet nach dem Laden beim Original; ein gespeicherter Zoom wird für das nächste Ergebnis übernommen.
 

@@ -19,7 +19,10 @@ class AppTest(unittest.TestCase):
         self.assertIn('Dein Motiv auflockern', response.get_data(as_text=True))
         html = response.get_data(as_text=True)
         self.assertLess(html.index('id="stage"'), html.index('id="jobsTable"'))
-        for path in ('/static/app.js', '/static/settings.js', '/static/jobs.js', '/static/style.css', '/static/rasterpilot-logo.svg'):
+        self.assertIn('id="tone_overlay"', html)
+        self.assertIn('Legende der Tonwertbereiche', html)
+        for path in ('/static/app.js', '/static/settings.js', '/static/jobs.js', '/static/tone-overlay.js',
+                     '/static/style.css', '/static/rasterpilot-logo.svg'):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             response.close()
